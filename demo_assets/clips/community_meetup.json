@@ -1,0 +1,13 @@
+{
+  "title": "Community meetup",
+  "description": "Event footage: a speaker on stage, an audience with name badges, phones recording, a laptop showing an inbox.",
+  "suggested_prompts": [
+    "Blur every face and name badge except the speaker in the green jacket, and black out the laptop screen.",
+    "Black out all screens and pixelate the badges."
+  ],
+  "frame_count": 192,
+  "order": 2,
+  "follow_up_prompts": [
+    "Also black out the phone screens."
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "title": "Market Street crossing",
+  "description": "CCTV-style street clip: pedestrians, passing cars and a delivery truck, two people on their phones.",
+  "suggested_prompts": [
+    "Blur every face and license plate except the woman in the red jacket, and black out phone screens.",
+    "Pixelate all faces and black out license plates."
+  ],
+  "frame_count": 192,
+  "order": 1,
+  "follow_up_prompts": [
+    "Also hide the logo on the truck."
+  ]
+}
