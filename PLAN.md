@@ -49,12 +49,12 @@ Checked 2026-10-25 on each clip's page. **None of these is CC0.** Pexels and Pix
 
 A privacy-redaction demo doesn't show anyone in a bad light, so both licenses allow it. Credit the creators in the README anyway.
 
-| Scenario | Primary | Alternate |
+| Scenario | Chosen (in `demo_assets/clips/`) | Alternate |
 |---|---|---|
-| Street: pedestrians, exception person, plate, shop-window reflection | [Pedestrians Passing by a Storefront](https://www.pexels.com/video/pedestrians-passing-by-a-storefront-3647789/), George Morina, 0:21, 1920×1080, Pexels License ("Free") | [People Walking on a Busy Street](https://www.pexels.com/video/people-walking-on-a-busy-street-5021555/), zahid Anwar, 0:13, 1920×1080, Pexels License |
-| Desk: laptop screen with email | [Person Writing an Email](https://www.pexels.com/video/person-writing-an-email-6183189/), Taryn Elliott, 0:08, 3840×2160, Pexels License | [A Man Typing on His Computer in the Cafe](https://www.pexels.com/video/a-man-typing-on-his-computer-in-the-cafe-4318511/), Pavel Danilyuk, 0:17, 1920×1080, Pexels License |
-| Crowd: two people crossing paths | [Traffic, Crowd, Crossing (Shibuya)](https://pixabay.com/videos/traffic-crowd-crossing-crosswalk-181114/), MagicTV, 0:10, 3840×2160, Pixabay Content License | [Crosswalk, Crowd, People](https://pixabay.com/videos/crosswalk-crowd-people-many-3630/), Coverr-Free-Footage, 0:15, 1920×1080, Pixabay Content License |
+| Street: faces toward camera, exception person, glass shopfronts | `manchester_street`: [People Walking on a Busy Street](https://www.pexels.com/video/people-walking-on-a-busy-street-5021555/), zahid Anwar, 0:13, Pexels License ("Free"). Exception: the woman in the pink coat. | [Pedestrians Passing by a Storefront](https://www.pexels.com/video/pedestrians-passing-by-a-storefront-3647789/) |
+| Desk: laptop screen with email | `desk_inbox`: [Person Writing an Email](https://www.pexels.com/video/person-writing-an-email-6183189/), Taryn Elliott, 0:08, Pexels License. Gmail inbox on screen, phone on the books, no faces. | [A Man Typing on His Computer in the Cafe](https://www.pexels.com/video/a-man-typing-on-his-computer-in-the-cafe-4318511/), Pexels License. Rejected: screen is edge-on and unreadable. |
+| Crowd: people crossing paths | `storefront_crossing`: [Pedestrians Passing by a Storefront](https://www.pexels.com/video/pedestrians-passing-by-a-storefront-3647789/), George Morina, 0:21, Pexels License. Many people crossing sideways with occlusions. | [Traffic, Crowd, Crossing (Shibuya)](https://pixabay.com/videos/traffic-crowd-crossing-crosswalk-181114/) and [Crosswalk, Crowd, People](https://pixabay.com/videos/crosswalk-crowd-people-many-3630/), Pixabay Content License. Not used: Pixabay returns 403 to scripted downloads. |
 
 Caveats:
-- Content was judged from page titles, descriptions and tags only. Check frames before committing to a clip: no listing confirms a visible shop-window reflection or a readable plate.
+- Frames of each chosen clip were checked. None shows a readable license plate, and none has a clear face reflected in glass; the shop-window reflection catch still needs footage you shoot yourself.
 - Stock clips don't contain someone saying a full name out loud, which T10 needs. Record that clip yourself, with consent.

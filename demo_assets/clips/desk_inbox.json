@@ -1,0 +1,12 @@
+{
+  "title": "Desk with an open inbox",
+  "description": "Real footage (Pexels, Taryn Elliott): someone typing an email, the inbox readable on the laptop, a phone on the books.",
+  "suggested_prompts": [
+    "Black out the laptop screen.",
+    "Blur the laptop screen and the phone."
+  ],
+  "order": 2,
+  "follow_up_prompts": [
+    "Also black out the phone."
+  ]
+}

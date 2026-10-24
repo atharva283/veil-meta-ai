@@ -130,7 +130,7 @@ class H264Writer:
             codec="libx264",
             quality=None,
             macro_block_size=2,
-            output_params=H264_OUT,
+            output_params=list(H264_OUT),  # imageio-ffmpeg appends audio flags to this list in place
             audio_path=str(audio_from) if audio_from and meta.has_audio else None,
             audio_codec="aac" if audio_from and meta.has_audio else None,
         )

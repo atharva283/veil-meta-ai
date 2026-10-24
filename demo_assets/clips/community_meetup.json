@@ -6,7 +6,7 @@
     "Black out all screens and pixelate the badges."
   ],
   "frame_count": 192,
-  "order": 2,
+  "order": 11,
   "follow_up_prompts": [
     "Also black out the phone screens."
   ]

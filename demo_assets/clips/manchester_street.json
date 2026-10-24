@@ -1,0 +1,12 @@
+{
+  "title": "Manchester high street",
+  "description": "Real footage (Pexels, zahid Anwar): shoppers walking toward the camera past glass shopfronts; a woman in a pink coat.",
+  "suggested_prompts": [
+    "Blur every face except the woman in the pink coat.",
+    "Pixelate all faces."
+  ],
+  "order": 1,
+  "follow_up_prompts": [
+    "Also hide the bank logo."
+  ]
+}

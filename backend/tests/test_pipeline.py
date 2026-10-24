@@ -1,5 +1,7 @@
 """End-to-end: plan -> segment -> render -> audit -> patch on the bundled street clip."""
 
+import subprocess
+
 import pytest
 
 from app.jobs import Job, jobs
@@ -68,3 +70,26 @@ def test_follow_up_reuses_tracks_and_carries_patches(street, first_run):
     assert entries["face-07"]["status"] == "patched"  # carried over, not re-discovered
     assert entries["face-02"]["status"] == "kept_visible"
     assert any("Reused cached tracks" in e["message"] for e in job.events)
+
+
+def test_writers_after_an_audio_mux_still_work(tmp_path):
+    """imageio-ffmpeg appends audio flags to output_params in place; the shared H264_OUT must stay clean."""
+    import numpy as np
+
+    from app.pipeline import video_io
+
+    src = tmp_path / "with_audio.mp4"
+    subprocess.run(
+        [video_io.FFMPEG, "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=gray:s=64x48:r=10:d=1",
+         "-f", "lavfi", "-i", "sine=d=1", "-shortest", "-pix_fmt", "yuv420p", str(src)],
+        check=True,
+    )  # fmt: skip
+    meta = video_io.probe(src)
+    assert meta.has_audio
+    frame = np.zeros((48, 64, 3), np.uint8)
+    for name, audio in (("redacted.mp4", src), ("masks.mp4", None)):
+        w = video_io.H264Writer(tmp_path / name, meta, audio_from=audio)
+        w.write(frame)
+        w.close()
+    assert video_io.H264_OUT == ["-preset", "veryfast", "-crf", "20", "-movflags", "+faststart"]
+    assert video_io.probe(tmp_path / "masks.mp4").has_audio is False

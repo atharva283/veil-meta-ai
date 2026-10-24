@@ -6,9 +6,9 @@ Task details are in [PLAN.md](PLAN.md). Status: todo · in progress · blocked �
 |---|---|---|
 | T1 Rules check on pre-existing code | blocked | Needs you: read the official rules. |
 | T2 SAM 3.1 Hugging Face access | blocked | Needs you: request access on the gated repo. |
-| T3 Real demo footage | in progress | Candidate clips and licenses in PLAN.md (none CC0; Pexels/Pixabay licenses). Next: download, check frames, add to demo_assets/clips. |
+| T3 Real demo footage | done | 3 Pexels clips added (1280x720), listed before the synthetic ones; all run end to end offline. Fixed a bug found doing this: any clip with audio broke `masks.mp4` and later encodes (shared ffmpeg arg list mutated); regression test added, 21/21 pass. Gaps: no plate, no clear reflection, no spoken name in stock footage; you need to shoot those. |
 | T4 SAM 3.1 on Modal | blocked | Modal CLI not installed or logged in here; needs your Modal account and T2. |
-| T5 Frame-by-frame exceptions | todo | |
+| T5 Frame-by-frame exceptions | in progress | T4 skipped for now: blocked on you. |
 | T6 SAM re-check of output | todo | |
 | T7 Planner eval (Ollama) | todo | Ollama is installed locally. |
 | T8 Redaction Report | todo | |

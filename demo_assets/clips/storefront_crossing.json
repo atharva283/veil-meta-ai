@@ -1,0 +1,12 @@
+{
+  "title": "Storefront crossing",
+  "description": "Real footage (Pexels, George Morina): pedestrians crossing paths in front of a department store entrance.",
+  "suggested_prompts": [
+    "Blur every face.",
+    "Blur every face except the woman with the yellow shopping bag."
+  ],
+  "order": 3,
+  "follow_up_prompts": [
+    "Also pixelate the shopping bags."
+  ]
+}

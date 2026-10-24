@@ -6,7 +6,7 @@
     "Pixelate all faces and black out license plates."
   ],
   "frame_count": 192,
-  "order": 1,
+  "order": 10,
   "follow_up_prompts": [
     "Also hide the logo on the truck."
   ]
