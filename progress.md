@@ -8,8 +8,8 @@ Task details are in [PLAN.md](PLAN.md). Status: todo · in progress · blocked �
 | T2 SAM 3.1 Hugging Face access | blocked | Needs you: request access on the gated repo. |
 | T3 Real demo footage | done | 3 Pexels clips added (1280x720), listed before the synthetic ones; all run end to end offline. Fixed a bug found doing this: any clip with audio broke `masks.mp4` and later encodes (shared ffmpeg arg list mutated); regression test added, 21/21 pass. Gaps: no plate, no clear reflection, no spoken name in stock footage; you need to shoot those. |
 | T4 SAM 3.1 on Modal | blocked | Modal CLI not installed or logged in here; needs your Modal account and T2. |
-| T5 Frame-by-frame exceptions | in progress | T4 skipped for now: blocked on you. |
-| T6 SAM re-check of output | todo | |
+| T5 Frame-by-frame exceptions | done | select/subtract split tracks per frame; a split exception shows as `<id>-visible` in the report; audit patches only skip frames that overlap the exception; patch frames on split fragments carry into follow-ups. Crossing tests fail on the old code and pass now; 24/24 pass. Side effect on the synthetic clip: her face is redacted on its first frame (frame 3), where her person mask has no head yet. |
+| T6 SAM re-check of output | todo | Next. |
 | T7 Planner eval (Ollama) | todo | Ollama is installed locally. |
 | T8 Redaction Report | todo | |
 | T9 Presets + cached samples | todo | |

@@ -102,6 +102,12 @@ def _compose(plan: Plan, seg: dict[str, list[Track]]) -> Composition:
             src, ref = values[step.source], values[step.reference]
             kept = select(src, ref)
             values[step.id], roots[step.id] = subtract(src, ref), roots[step.source]
+            # A track on both sides means tracking swapped identities partway
+            # through; give the visible part its own id so the report shows both.
+            redacted_ids = {t.track_id for t in values[step.id]}
+            for t in kept:
+                if t.track_id in redacted_ids:
+                    t.track_id = f"{t.track_id}-visible"
             # Describe who is kept ("the woman in the red jacket"), not the step.
             why = by_id[step.reference].note or step.note or "excluded by instruction"
             for t in kept:
@@ -163,8 +169,11 @@ def _absorb_patch(comp: Composition, finding: AuditFinding, track: Track) -> tup
     ]
     if not layers:
         return "unfixable", None
-    if any(tracks_overlap(track, k) for k in comp.kept):
-        return "kept", None  # never override the user's exception
+    # Never override the user's exception, but only on the frames where it applies.
+    outside = subtract([track], comp.kept)
+    if not outside:
+        return "kept", None
+    track = outside[0]
     for layer in layers:
         for existing in layer.tracks:
             if existing.track_id == track.track_id or tracks_overlap(track, existing) or tracks_overlap(existing, track):
@@ -410,9 +419,18 @@ def run_job(job: Job, manager: JobManager) -> None:
     job.final_tracks = {c: list(ts) for c, ts in seg_results.items()}
     for layer in comp.layers:
         for t in layer.tracks:
+            if t.source != "audit_patch":
+                continue
             bucket = job.final_tracks.setdefault(t.concept, [])
-            if t.source == "audit_patch" and not any(t is x for x in bucket):
+            same = next((x for x in bucket if x.track_id == t.track_id), None)
+            if same is None:
                 bucket.append(t)
+            elif same is not t:
+                # t is a per-frame fragment of a segment track (see tracks._split):
+                # carry its patch frames back to the whole track.
+                for f, fm in t.frames.items():
+                    same.frames.setdefault(f, fm)
+                same.source = "audit_patch"
 
     _report(job, video, comp, patched, unresolved, sorted(samples), rounds)
     job.outputs["redacted_url"] = media_url(job_dir / "redacted.mp4")

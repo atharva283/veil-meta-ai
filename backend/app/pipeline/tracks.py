@@ -73,12 +73,34 @@ def tracks_overlap(a: Track, b: Track) -> bool:
     return hits / len(shared) >= 0.5
 
 
+def _split(t: Track, reference: list[Track]) -> tuple[Track, Track]:
+    """Split t into (frames where it overlaps some reference instance, all other frames).
+
+    Decided frame by frame, not per track: if tracking swaps two identities
+    mid-clip, the frames that belong to the other person land on the other
+    side instead of riding along with the majority. A side that holds every
+    frame is t itself, so unsplit tracks keep their identity.
+    """
+    inside: dict[int, FrameMask] = {}
+    outside: dict[int, FrameMask] = {}
+    for f, fm in t.frames.items():
+        hit = any(f in r.frames and overlap_fraction(fm, r.frames[f]) >= OVERLAP_THRESHOLD for r in reference)
+        (inside if hit else outside)[f] = fm
+
+    def side(frames: dict[int, FrameMask]) -> Track:
+        return t if len(frames) == len(t.frames) else Track(t.track_id, t.concept, frames, t.source)
+
+    return side(inside), side(outside)
+
+
 def select(source: list[Track], reference: list[Track]) -> list[Track]:
-    return [t for t in source if any(tracks_overlap(t, r) for r in reference)]
+    """Each source instance, restricted to the frames where it overlaps a reference instance."""
+    return [inside for inside, _ in (_split(t, reference) for t in source) if inside.frames]
 
 
 def subtract(source: list[Track], reference: list[Track]) -> list[Track]:
-    return [t for t in source if not any(tracks_overlap(t, r) for r in reference)]
+    """Each source instance, restricted to the frames where it overlaps no reference instance."""
+    return [outside for _, outside in (_split(t, reference) for t in source) if outside.frames]
 
 
 def union(*sets: Iterable[Track]) -> list[Track]:

@@ -33,3 +33,38 @@ def test_fill_gaps_bridges_short_dropouts_only():
     assert [f for f in range(5)] == [f for f in t.frame_indices if f <= 4]
     assert t.frames[2].box == (20, 0, 30, 10)
     assert 10 not in t.frames
+
+
+def test_identity_swap_is_split_per_frame():
+    # Tracking follows her face for frames 0-4, then swaps onto a passing stranger's face.
+    swapped = _box_track("face-1", {f: (10, 10, 20, 20) if f < 5 else (200, 10, 210, 20) for f in range(10)})
+    her = _box_track("person", {f: (5, 5, 30, 80) for f in range(10)})
+    kept, redacted = select([swapped], [her]), subtract([swapped], [her])
+    assert kept[0].frame_indices == [0, 1, 2, 3, 4]
+    assert redacted[0].frame_indices == [5, 6, 7, 8, 9]  # the stranger is redacted, not kept with her
+
+
+def test_unsplit_tracks_keep_their_identity():
+    face = _box_track("face-1", {0: (10, 10, 20, 20), 1: (11, 10, 21, 20)})
+    her = _box_track("person", {0: (5, 5, 30, 80), 1: (6, 5, 31, 80)})
+    assert select([face], [her])[0] is face
+    assert subtract([face], []) == [face] and subtract([face], [])[0] is face
+
+
+def test_compose_redacts_the_swapped_frames_and_reports_both_parts():
+    from app.orchestrator import _compose
+    from app.schemas import Plan
+
+    swapped = _box_track("face-1", {f: (10, 10, 20, 20) if f < 5 else (200, 10, 210, 20) for f in range(10)})
+    swapped.concept = "face"
+    her = _box_track("person-1", {f: (5, 5, 30, 80) for f in range(10)})
+    plan = Plan(steps=[
+        {"id": "s1", "op": "segment", "concept": "face"},
+        {"id": "s2", "op": "segment", "concept": "person"},
+        {"id": "s3", "op": "subtract", "source": "s1", "reference": "s2", "note": "faces except her"},
+        {"id": "s4", "op": "effect", "source": "s3", "effect": "blur"},
+    ])  # fmt: skip
+    comp = _compose(plan, {"face": [swapped], "person": [her]})
+    (layer,) = comp.layers
+    assert [(t.track_id, t.frame_indices) for t in layer.tracks] == [("face-1", [5, 6, 7, 8, 9])]
+    assert [(t.track_id, t.frame_indices) for t in comp.kept] == [("face-1-visible", [0, 1, 2, 3, 4])]

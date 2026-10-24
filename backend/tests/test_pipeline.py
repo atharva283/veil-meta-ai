@@ -34,8 +34,11 @@ def _by_id(job):
 
 def test_exception_is_kept_visible(first_run):
     entries = _by_id(first_run)
-    assert entries["face-02"]["status"] == "kept_visible"
-    assert "woman in the red jacket" in entries["face-02"]["note"]
+    assert entries["face-02-visible"]["status"] == "kept_visible"
+    assert "woman in the red jacket" in entries["face-02-visible"]["note"]
+    # Exceptions are decided per frame. On frame 3 her head is drawn before her
+    # person mask includes it, so that one frame stays redacted (the safe side).
+    assert entries["face-02"]["status"] == "verified" and entries["face-02"]["frames"] == 1
 
 
 def test_audit_catches_and_patches_first_pass_misses(first_run):
@@ -68,7 +71,7 @@ def test_follow_up_reuses_tracks_and_carries_patches(street, first_run):
     entries = _by_id(job)
     assert entries["logo-03"]["status"] == "verified"
     assert entries["face-07"]["status"] == "patched"  # carried over, not re-discovered
-    assert entries["face-02"]["status"] == "kept_visible"
+    assert entries["face-02-visible"]["status"] == "kept_visible"
     assert any("Reused cached tracks" in e["message"] for e in job.events)
 
 

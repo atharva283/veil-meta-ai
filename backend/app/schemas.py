@@ -15,8 +15,8 @@ class Step(BaseModel):
 
     segment  -- run SAM 3.1 for `concept`; yields a set of tracked instances
     union    -- merge the instance sets in `inputs`
-    select   -- keep instances of `source` that overlap any instance of `reference`
-    subtract -- drop instances of `source` that overlap any instance of `reference`
+    select   -- keep instances of `source` on the frames where they overlap an instance of `reference`
+    subtract -- keep instances of `source` on the frames where they overlap no instance of `reference`
     effect   -- render `effect` over every instance of `source`
     """
 
