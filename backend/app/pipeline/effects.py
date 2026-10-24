@@ -42,14 +42,25 @@ def concept_color(concept: str) -> tuple[int, int, int]:
     return _FALLBACK[digest % len(_FALLBACK)]
 
 
-def _region(frame: np.ndarray, fm: FrameMask, pad: int):
-    """Padded region around a mask (masks are always clipped to the frame)."""
-    h, w = frame.shape[:2]
+def _region(width: int, height: int, fm: FrameMask):
+    """The padded, dilated area an effect covers around a mask (masks are always clipped to the frame)."""
+    bw, bh = fm.box[2] - fm.box[0], fm.box[3] - fm.box[1]
+    pad = max(4, int(0.12 * max(bw, bh)))
     x0, y0, x1, y1 = fm.box
-    X0, Y0, X1, Y1 = max(0, x0 - pad), max(0, y0 - pad), min(w, x1 + pad), min(h, y1 + pad)
+    X0, Y0, X1, Y1 = max(0, x0 - pad), max(0, y0 - pad), min(width, x1 + pad), min(height, y1 + pad)
     local = np.zeros((Y1 - Y0, X1 - X0), dtype=np.uint8)
     local[y0 - Y0 : y1 - Y0, x0 - X0 : x1 - X0] = fm.mask.astype(np.uint8) * 255
-    return (X0, Y0, X1, Y1), local
+    k = max(3, (pad // 2) * 2 + 1)
+    local = cv2.dilate(local, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    return (X0, Y0, X1, Y1), local, pad
+
+
+def obscured_mask(fm: FrameMask, effect: str, width: int, height: int) -> FrameMask | None:
+    """The pixels apply_effect actually hides for this instance (None for highlight)."""
+    if effect == "highlight" or fm.box[2] <= fm.box[0] or fm.box[3] <= fm.box[1]:
+        return None
+    box, local, _ = _region(width, height, fm)
+    return FrameMask(box, local > 0, fm.score)
 
 
 def apply_effect(frame: np.ndarray, fm: FrameMask, effect: str) -> None:
@@ -60,10 +71,7 @@ def apply_effect(frame: np.ndarray, fm: FrameMask, effect: str) -> None:
     if effect == "highlight":
         _outline(frame, fm, (255, 255, 255), 2)
         return
-    pad = max(4, int(0.12 * max(bw, bh)))
-    (X0, Y0, X1, Y1), local = _region(frame, fm, pad)
-    k = max(3, (pad // 2) * 2 + 1)
-    local = cv2.dilate(local, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+    (X0, Y0, X1, Y1), local, pad = _region(frame.shape[1], frame.shape[0], fm)
     region = frame[Y0:Y1, X0:X1]
     rh, rw = region.shape[:2]
 

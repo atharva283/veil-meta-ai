@@ -42,8 +42,11 @@ export function AuditLog({ job, time, onSeek }: Props) {
         <div>
           <h2 id="audit-h">Privacy audit log</h2>
           <p className="muted">
-            {summary}. Checked {job.audit.audited_frames ?? 0} output frames in {job.audit.rounds ?? 0} round
-            {job.audit.rounds === 1 ? "" : "s"}.
+            {summary}. Checked {job.audit.audited_frames ?? 0} sampled frames
+            {job.audit.rechecked_frames
+              ? ` and re-segmented ${job.audit.rechecked_frames} of ${job.audit.frame_count ?? job.audit.rechecked_frames} output frames (${Math.round((100 * job.audit.rechecked_frames) / (job.audit.frame_count || job.audit.rechecked_frames))}%)`
+              : ""}{" "}
+            in {job.audit.rounds ?? 0} round{job.audit.rounds === 1 ? "" : "s"}.
           </p>
         </div>
         <div className="audit-actions">

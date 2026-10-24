@@ -68,9 +68,14 @@ class ModalSamSegmenter:
             raise SegmenterError(f"SAM service /{route} returned {resp.status_code}: {resp.text[:300]}")
         return resp.json()
 
-    def segment(self, video: VideoRecord, concepts: list[str]) -> dict[str, list[Track]]:
+    def segment(
+        self, video: VideoRecord, concepts: list[str], score_threshold: float | None = None, frame_stride: int | None = None
+    ) -> dict[str, list[Track]]:
         prompts = [{"id": f"p{i}", "text": c} for i, c in enumerate(concepts)]
-        data = self._post("segment", video, {"prompts": prompts, "score_threshold": 0.45})
+        payload = {"prompts": prompts, "score_threshold": score_threshold if score_threshold is not None else 0.45}
+        if frame_stride:
+            payload["frame_stride"] = frame_stride
+        data = self._post("segment", video, payload)
         by_id = {r["id"]: r for r in data.get("results", [])}
         tracked = bool(data.get("tracked", True))
         W, H = video.meta.width, video.meta.height

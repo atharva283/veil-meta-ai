@@ -5,13 +5,16 @@ from __future__ import annotations
 import json
 import threading
 from dataclasses import dataclass, field
+from functools import cache
+from pathlib import Path
 
 from .auditor import AuditPolicy, AuditSample, get_auditor, mock_auditor
+from .auditor.sam_recheck import RecheckResult, recheck
 from .config import settings
 from .jobs import Job, JobManager
 from .pipeline import video_io
-from .pipeline.effects import CLASS_COLORS, apply_effect, concept_class, concept_color, draw_preview
-from .pipeline.tracks import Track, box_iou, clip_mask, select, subtract, tracks_overlap, union
+from .pipeline.effects import CLASS_COLORS, apply_effect, concept_class, concept_color, draw_preview, obscured_mask
+from .pipeline.tracks import FrameMask, Track, box_iou, clip_mask, select, subtract, tracks_overlap, union
 from .planner import make_plan
 from .schemas import AuditEntry, AuditFinding, Plan
 from .segmenter import RefineRequest, get_segmenter, mock_segmenter
@@ -223,6 +226,41 @@ def _representative(group: list[AuditFinding]) -> AuditFinding:
     return max(group, key=lambda f: (f.box[2] - f.box[0]) * (f.box[3] - f.box[1]))
 
 
+def _recheck(job: Job, seg, video: VideoRecord, comp: Composition, output: Path, targets: list[str]) -> RecheckResult:
+    """Re-segment the rendered output on every frame (see auditor.sam_recheck)."""
+    W, H = video.meta.width, video.meta.height
+
+    @cache
+    def obscured_at(f: int) -> list[FrameMask]:
+        out = []
+        for layer in comp.layers:
+            for t in layer.tracks:
+                fm = clip_mask(t.frames[f], W, H) if f in t.frames else None
+                hidden = obscured_mask(fm, layer.effect, W, H) if fm else None
+                if hidden is not None:
+                    out.append(hidden)
+        return out
+
+    def kept_at(f: int) -> list[FrameMask]:
+        return [t.frames[f] for t in comp.kept if f in t.frames]
+
+    def offline() -> RecheckResult:
+        # Haar on every output frame flags pavement and doorways as faces, and
+        # its patches blur them; without SAM or ground truth, skip and say so.
+        if video.annotations is None:
+            job.log("SAM re-check skipped: uploaded clips need SAM 3.1 for it (set MODAL_ENDPOINT).", level="warn", stage="audit")
+            return RecheckResult([], 0)
+        return recheck(mock_segmenter, video, output, targets, obscured_at, kept_at)
+
+    if seg is mock_segmenter:
+        return offline()
+    try:
+        return recheck(seg, video, output, targets, obscured_at, kept_at)
+    except Exception as exc:
+        job.log(f"SAM re-check failed ({exc}); using the offline segmenter.", level="warn", stage="audit")
+        return offline()
+
+
 # ---------------------------------------------------------------------------
 # Reporting
 # ---------------------------------------------------------------------------
@@ -238,7 +276,7 @@ def _spans(frames: list[int], fps: float) -> list[list[float]]:
     return [[round(a / fps, 3), round((b + 1) / fps, 3)] for a, b in spans]
 
 
-def _report(job: Job, video: VideoRecord, comp: Composition, patched: dict[str, dict], unresolved: list[AuditFinding], audited: list[int], rounds: int) -> None:
+def _report(job: Job, video: VideoRecord, comp: Composition, patched: dict[str, dict], unresolved: list[AuditFinding], audited: list[int], rechecked: int, rounds: int) -> None:
     fps = video.meta.fps
     entries: list[AuditEntry] = []
     timeline: list[dict] = []
@@ -276,7 +314,10 @@ def _report(job: Job, video: VideoRecord, comp: Composition, patched: dict[str, 
             elif t.source == "audit_patch":
                 add(t, t.concept, layer.effect, "patched", "Caught by the audit in the previous pass and carried over.")
             else:
-                add(t, t.concept, layer.effect, "verified", f"No leak found in {checks} audited frame{'s' if checks != 1 else ''}.")
+                note = f"No leak found in {checks} sampled frame{'s' if checks != 1 else ''}"
+                if rechecked:
+                    note += f" or by the SAM re-check of all {len(span)} frames it appears in"
+                add(t, t.concept, layer.effect, "verified", note + ".")
     for t in comp.kept:
         add(t, t.concept, None, "kept_visible", f"Left visible on purpose: {comp.kept_notes.get(t.track_id, 'exception')}.")
     for i, f in enumerate(unresolved, start=1):
@@ -293,6 +334,8 @@ def _report(job: Job, video: VideoRecord, comp: Composition, patched: dict[str, 
         "counts": counts,
         "rounds": rounds,
         "audited_frames": len(audited),
+        "rechecked_frames": rechecked,
+        "frame_count": video.meta.frame_count,
         "patches": [{"track_id": tid, **p} for tid, p in patched.items()],
     }
     job.timeline = {"duration_s": round(video.meta.duration_s, 3), "fps": fps, "tracks": timeline}
@@ -357,7 +400,7 @@ def run_job(job: Job, manager: JobManager) -> None:
     policy = AuditPolicy(targets=targets, kept_descriptions=sorted(set(comp.kept_notes.values())))
     patched: dict[str, dict] = {}
     unresolved: list[AuditFinding] = []
-    rounds = 0
+    rounds = rechecked = 0
     job.start_stage("audit")
     for rounds in range(1, settings.audit_max_rounds + 1):
         sample_list = [samples[k] for k in sorted(samples)]
@@ -370,11 +413,17 @@ def run_job(job: Job, manager: JobManager) -> None:
             auditor = mock_auditor
             job.modes["auditor"] = f"{mock_auditor.name} (fallback)"
             findings = auditor.audit(video, sample_list, policy)
+        # Muse Spark judges sampled frames; SAM re-segments every frame in between.
+        rc = _recheck(job, seg, video, comp, job_dir / "redacted.mp4", targets)
+        rechecked = rc.frames_checked
+        findings = findings + rc.findings
         sample_gap = max(1, round(video.meta.fps / max(0.1, settings.audit_sample_fps)))
         groups = _group_findings(findings, max_frame_gap=3 * sample_gap)
         findings = [_representative(g) for g in groups]
         job.log(
-            f"Audit round {rounds}: checked {len(sample_list)} frames, found {len(findings)} leaked object(s)"
+            f"Audit round {rounds}: checked {len(sample_list)} sampled frames"
+            + (f" and re-segmented all {rechecked}" if rechecked else "")
+            + f", found {len(findings)} leaked object(s)"
             + (f" across {sum(len(g) for g in groups)} frame reports." if groups else "."),
             stage="audit",
         )
@@ -432,7 +481,7 @@ def run_job(job: Job, manager: JobManager) -> None:
                     same.frames.setdefault(f, fm)
                 same.source = "audit_patch"
 
-    _report(job, video, comp, patched, unresolved, sorted(samples), rounds)
+    _report(job, video, comp, patched, unresolved, sorted(samples), rechecked, rounds)
     job.outputs["redacted_url"] = media_url(job_dir / "redacted.mp4")
     job.outputs["masks_url"] = media_url(job_dir / "masks.mp4")
     (job_dir / "audit.json").write_text(json.dumps({"instruction": job.instruction, "plan": plan.model_dump(), **job.audit}, indent=2), encoding="utf-8")

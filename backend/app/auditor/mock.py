@@ -8,28 +8,13 @@ still detectable outside the redacted and intentionally visible regions leaked.
 
 from __future__ import annotations
 
-import numpy as np
-
 from ..pipeline.effects import concept_class
-from ..pipeline.tracks import FrameMask, overlap_fraction
+from ..pipeline.tracks import covered_fraction as _covered
+from ..pipeline.tracks import overlap_fraction
 from ..schemas import AuditFinding
 from ..segmenter.mock import MockSegmenter
 from ..videos import VideoRecord
 from .base import AuditPolicy, AuditSample
-
-
-def _covered(fm: FrameMask, masks: list[FrameMask]) -> float:
-    """Fraction of fm covered by the union of masks (approximate: max single overlap
-    plus a union pass when several masks touch it)."""
-    touching = [m for m in masks if overlap_fraction(fm, m) > 0]
-    if not touching:
-        return 0.0
-    x0, y0, x1, y1 = fm.box
-    acc = np.zeros(fm.mask.shape, dtype=bool)
-    for m in touching:
-        ix0, iy0, ix1, iy1 = max(x0, m.box[0]), max(y0, m.box[1]), min(x1, m.box[2]), min(y1, m.box[3])
-        acc[iy0 - y0 : iy1 - y0, ix0 - x0 : ix1 - x0] |= m.mask[iy0 - m.box[1] : iy1 - m.box[1], ix0 - m.box[0] : ix1 - m.box[0]]
-    return float(np.logical_and(acc, fm.mask).sum()) / max(1, fm.area)
 
 
 class MockAuditor:

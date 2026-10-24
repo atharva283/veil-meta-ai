@@ -56,6 +56,19 @@ def overlap_fraction(a: FrameMask, b: FrameMask) -> float:
     return float(np.logical_and(ca, cb).sum()) / a.area
 
 
+def covered_fraction(fm: FrameMask, masks: list[FrameMask]) -> float:
+    """Fraction of fm's pixels covered by the union of masks."""
+    touching = [m for m in masks if overlap_fraction(fm, m) > 0]
+    if not touching:
+        return 0.0
+    x0, y0, x1, y1 = fm.box
+    acc = np.zeros(fm.mask.shape, dtype=bool)
+    for m in touching:
+        ix0, iy0, ix1, iy1 = max(x0, m.box[0]), max(y0, m.box[1]), min(x1, m.box[2]), min(y1, m.box[3])
+        acc[iy0 - y0 : iy1 - y0, ix0 - x0 : ix1 - x0] |= m.mask[iy0 - m.box[1] : iy1 - m.box[1], ix0 - m.box[0] : ix1 - m.box[0]]
+    return float(np.logical_and(acc, fm.mask).sum()) / max(1, fm.area)
+
+
 def box_iou(a: tuple[float, ...], b: tuple[float, ...]) -> float:
     x0, y0 = max(a[0], b[0]), max(a[1], b[1])
     x1, y1 = min(a[2], b[2]), min(a[3], b[3])

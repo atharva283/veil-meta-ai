@@ -94,6 +94,8 @@ export type Job = {
     counts?: Record<AuditStatus, number>;
     rounds?: number;
     audited_frames?: number;
+    rechecked_frames?: number;
+    frame_count?: number;
   };
   timeline: { duration_s?: number; fps?: number; tracks?: TimelineTrack[] };
   modes: { planner?: string; segmenter?: string; auditor?: string };

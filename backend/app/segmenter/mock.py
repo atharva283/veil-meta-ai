@@ -33,6 +33,9 @@ SYNONYMS = {
     "head": "face", "vehicle": "car", "monitor": "screen", "display": "screen",
 }  # fmt: skip
 
+# Thresholds below this (the live first pass uses 0.45) also return "hard" instances.
+LOW_THRESHOLD = 0.45
+
 
 def _score(track_id: str, lo: float, hi: float) -> float:
     h = int(hashlib.sha1(track_id.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF
@@ -138,10 +141,10 @@ class MockSegmenter:
                     dets.append(fm)
         return dets
 
-    def _haar_tracks(self, video: VideoRecord, concept: str) -> list[Track]:
+    def _haar_tracks(self, video: VideoRecord, concept: str, stride: int = 2) -> list[Track]:
         if concept_class(concept) not in ("face", "plate"):
             return []
-        stride = 2  # detect every other frame; fill_gaps bridges the rest
+        # By default detect every other frame; fill_gaps bridges the rest.
         per_frame = {
             i: self.detect_frame(frame, concept)
             for i, frame in enumerate(video_io.iter_frames(video.path))
@@ -155,10 +158,15 @@ class MockSegmenter:
 
     # -- Segmenter protocol --------------------------------------------------
 
-    def segment(self, video: VideoRecord, concepts: list[str]) -> dict[str, list[Track]]:
+    def segment(
+        self, video: VideoRecord, concepts: list[str], score_threshold: float | None = None, frame_stride: int | None = None
+    ) -> dict[str, list[Track]]:
         if video.annotations:
-            return {c: self._gt_tracks(video, c, include_hard=False) for c in concepts}
-        return {c: self._haar_tracks(video, c) for c in concepts}
+            # "Hard" instances stand in for SAM's low-confidence misses, so a
+            # low-threshold pass (the output re-check) finds them.
+            low = score_threshold is not None and score_threshold < LOW_THRESHOLD
+            return {c: self._gt_tracks(video, c, include_hard=low) for c in concepts}
+        return {c: self._haar_tracks(video, c, stride=frame_stride or 2) for c in concepts}
 
     def refine(self, video: VideoRecord, requests: list[RefineRequest]) -> list[Track | None]:
         out: list[Track | None] = []

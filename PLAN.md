@@ -15,7 +15,7 @@ Status lives in [progress.md](progress.md).
 | T1 | Check hackathon rules on pre-existing code (repo's first commit is Oct 22). If strict, get a written answer from organizers. | you | Rule read; decision recorded in progress.md |
 | T2 | Request access to the gated SAM 3.1 weights on Hugging Face; create a read token. | you | Access granted |
 | T3 | Real demo footage: 3 clips (street + exception + reflection, desk with laptop screen, crowd with two people crossing). Candidate stock clips below. Add each to `demo_assets/clips/` with a `clip.json`. | none | 3 real clips selectable in the UI |
-| T4 | SAM 3.1 on Modal: fix the `VERIFY` lines in `backend/modal_app/sam3_service.py`, cache weights in a Modal Volume, switch `/segment` to the video predictor (`tracked=true`), add point prompts to `/refine`. | you (Modal account + T2) | Smoke test from the service docstring returns tracked objects |
+| T4 | SAM 3.1 on Modal: fix the `VERIFY` lines in `backend/modal_app/sam3_service.py`, cache weights in a Modal Volume, switch `/segment` to the video predictor (`tracked=true`), add point prompts to `/refine`. | none (Modal + HF ready as of Oct 25) | Smoke test from the service docstring returns tracked objects |
 | T5 | Frame-by-frame exceptions: `select`/`subtract` decide per frame, not per whole track, so an identity switch can't keep a stranger's face visible. Test with two people crossing. (`backend/app/pipeline/tracks.py`, `_compose` in `backend/app/orchestrator.py`) | none | New crossing test passes; existing tests pass |
 | T6 | SAM re-check of the output: run SAM on `redacted.mp4` (same concepts, low threshold, every frame); flag detections less than ~80% covered by applied masks; feed findings into the existing patch loop next to Muse Spark. New `backend/app/auditor/sam_recheck.py`. | none (mock now; live after T4) | Leaks between audit samples are caught in tests; report states % of frames checked |
 | T7 | Planner eval: 12 instructions, plan-validity score, run against Ollama (`http://localhost:11434/v1`, `llama3.1:8b`). | none | Script prints a score for the README |
@@ -30,8 +30,8 @@ Status lives in [progress.md](progress.md).
 | T11 | Fill `.env`; `GET /models`; set the newest allowed Llama as planner. If a multimodal Llama is available, give the planner a keyframe. | keys | Top bar shows planner "live" |
 | T12 | Muse Spark contract check: send 4 frames with a known unblurred face, confirm box format (assumed 0–1000) and `image_url` input; fix `_audit_batch` if wrong. | keys | Boxes land on the face |
 | T13 | Full live run: 3 clips × 4 instructions. Record wall-clock times and before/after residual leak counts. | keys | Numbers table filled in |
-| T14 | Click-to-correct: `POST /api/jobs/{id}/corrections {frame, x, y, action: redact\|keep}` → SAM point refine → re-render only; click handler in `frontend/src/components/Stage.tsx`. | you (needs T4 live) | Clicking a person toggles their redaction |
-| T15 | Deploy the FastAPI app to Modal with cached samples; keep a container warm only during judging. | you (Modal) | Public URL works cold |
+| T14 | Click-to-correct: `POST /api/jobs/{id}/corrections {frame, x, y, action: redact\|keep}` → SAM point refine → re-render only; click handler in `frontend/src/components/Stage.tsx`. | none (needs T4 live) | Clicking a person toggles their redaction |
+| T15 | Deploy the FastAPI app to Modal with cached samples; keep a container warm only during judging. | none (Modal ready) | Public URL works cold |
 
 ## Phase 3: polish (Oct 27)
 

@@ -19,8 +19,14 @@ class RefineRequest:
 class Segmenter(Protocol):
     name: str
 
-    def segment(self, video: VideoRecord, concepts: list[str]) -> dict[str, list[Track]]:
-        """Text-prompted segmentation + tracking for each concept."""
+    def segment(
+        self, video: VideoRecord, concepts: list[str], score_threshold: float | None = None, frame_stride: int | None = None
+    ) -> dict[str, list[Track]]:
+        """Text-prompted segmentation + tracking for each concept.
+
+        The defaults suit the first pass; the output re-check asks for a low
+        threshold on every frame (frame_stride=1).
+        """
         ...
 
     def refine(self, video: VideoRecord, requests: list[RefineRequest]) -> list[Track | None]:
