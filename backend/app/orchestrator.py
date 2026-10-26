@@ -484,7 +484,7 @@ def run_job(job: Job, manager: JobManager) -> None:
     _report(job, video, comp, patched, unresolved, sorted(samples), rechecked, rounds)
     job.outputs["redacted_url"] = media_url(job_dir / "redacted.mp4")
     job.outputs["masks_url"] = media_url(job_dir / "masks.mp4")
-    (job_dir / "audit.json").write_text(json.dumps({"instruction": job.instruction, "plan": plan.model_dump(), **job.audit}, indent=2), encoding="utf-8")
+    (job_dir / "audit.json").write_text(json.dumps({"instruction": job.instruction, "plan": plan.model_dump(), "modes": job.modes, **job.audit}, indent=2), encoding="utf-8")
     job.outputs["audit_url"] = media_url(job_dir / "audit.json")
     job.progress = 1.0
     job.log("Done. Redacted video and audit log are ready.", stage="done")
