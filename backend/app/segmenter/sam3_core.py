@@ -23,6 +23,10 @@ from pathlib import Path
 
 SAM_COMMIT = "f1647e8d0c1d280991f4d1b7d974c2704537fe66"  # facebookresearch/sam3 main, 2026-10-23
 MAX_OBJECTS = 64  # per prompt; SAM 3.1's default of 16 is too few for a crowd
+# Tracker state kept per frame during a forward pass. SAM 3.1 reads memories from the last
+# 7 frames and object pointers from the last 16; anything older is only used for
+# interactive corrections, which `segment` doesn't do.
+KEEP_FRAMES = 48
 PRECISIONS = {"bf16": "torch.bfloat16", "fp16": "torch.float16", "fp32": "torch.float32"}
 _PATCHED_DIRS = ("model", "perflib")
 
@@ -79,6 +83,10 @@ def auto_precision() -> str:
 
 def load_predictor(precision: str = "auto"):
     """Build the SAM 3.1 video predictor; returns (predictor, description)."""
+    import os
+
+    # Before the first CUDA allocation: lets freed blocks be reused across sizes (less fragmentation).
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     precision = auto_precision() if precision == "auto" else precision
     set_precision(precision)
     import torch
@@ -89,7 +97,11 @@ def load_predictor(precision: str = "auto"):
     # Flash-Attention 3 kernels need Hopper; everything else takes the PyTorch path.
     predictor = build_sam3_predictor(version="sam3.1", use_fa3=False, max_num_objects=MAX_OBJECTS)
     _drop_unknown_init_kwargs(predictor.model)
-    gpu =torch.cuda.get_device_name() if torch.cuda.is_available() else "CPU"
+    if _offload():
+        # Post-process one frame at a time instead of 16 (upstream: "set to 1 to disable batching");
+        # a batch holds 16 frames of full-resolution masks for every object on the GPU at once.
+        predictor.model.postprocess_batch_size = 1
+    gpu = torch.cuda.get_device_name() if torch.cuda.is_available() else "CPU"
     return predictor, f"SAM 3.1 ({gpu}, {precision})"
 
 
@@ -156,10 +168,36 @@ def _objects(found: dict) -> list[dict]:
     return [{"obj_id": oid, "detections": [d for _, d in sorted(frames.items())]} for oid, frames in sorted(found.items())]
 
 
-def segment(predictor, video_path: str, prompts: list[dict], threshold: float = 0.45) -> dict:
+def _prune(predictor, session: str, frame_idx: int) -> None:
+    """Drop tracker state for the frame `KEEP_FRAMES` behind `frame_idx` (forward pass only).
+
+    sam3 keeps every frame's memory features, image features and masks for the whole
+    session, which outgrows a 15 GB GPU in a few seconds of a busy clip. Missing frames
+    are skipped as padding when the tracker gathers its memory.
+    """
+    state = getattr(predictor, "_all_inference_states", {}).get(session, {}).get("state", {})
+    old = frame_idx - KEEP_FRAMES
+    for tracker in state.get("sam2_inference_states", []):
+        tracker["output_dict"]["non_cond_frame_outputs"].pop(old, None)
+        for per_obj in tracker["output_dict_per_obj"].values():
+            per_obj["non_cond_frame_outputs"].pop(old, None)
+
+
+def _free_cuda() -> None:
+    """Hand the allocator's cached blocks back, e.g. for Ollama loading the planner between runs."""
+    try:
+        import torch
+    except ImportError:
+        return
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
+def segment(predictor, video_path: str, prompts: list[dict], threshold: float = 0.45, on_frame=None) -> dict:
     """Text-prompt each concept on frame 0 and track every instance through the clip.
 
-    Objects that enter later are picked up as propagation reaches them.
+    Objects that enter later are picked up as propagation reaches them. `on_frame(frame_idx)`
+    is called after each frame (the smoke test uses it to report memory).
     """
     session = _start(predictor, video_path)
     results = []
@@ -171,14 +209,20 @@ def segment(predictor, video_path: str, prompts: list[dict], threshold: float = 
                 "type": "add_prompt", "session_id": session, "frame_index": 0, "text": p["text"], "output_prob_thresh": threshold,
             })  # fmt: skip
             _collect(found, out["frame_index"], out["outputs"], threshold)
+            # evict_cached_frame_outputs: drop each frame's full-resolution masks once they're
+            # streamed to us instead of keeping them on the GPU for the rest of the session.
             for r in predictor.handle_stream_request(request={
                 "type": "propagate_in_video", "session_id": session, "propagation_direction": "forward",
-                "start_frame_index": 0, "output_prob_thresh": threshold,
+                "start_frame_index": 0, "output_prob_thresh": threshold, "evict_cached_frame_outputs": True,
             }):  # fmt: skip
                 _collect(found, r["frame_index"], r["outputs"], threshold)
+                _prune(predictor, session, r["frame_index"])
+                if on_frame:
+                    on_frame(r["frame_index"])
             results.append({"id": p["id"], "objects": _objects(found)})
     finally:
         predictor.handle_request(request={"type": "close_session", "session_id": session})
+        _free_cuda()
     return {"tracked": True, "results": results}
 
 
@@ -207,6 +251,7 @@ def refine(predictor, video_path: str, requests: list[dict], width: int, height:
             results.append({"id": r["id"], "objects": _objects(found)})
     finally:
         predictor.handle_request(request={"type": "close_session", "session_id": session})
+        _free_cuda()
     return {"tracked": True, "results": results}
 
 
@@ -234,11 +279,17 @@ def smoke(clip: str, concept: str, frames: int, precision: str) -> None:
     t0 = time.time()
     predictor, desc = load_predictor(precision)
     t1 = time.time()
-    data = segment(predictor, path, [{"id": "p0", "text": concept}])
+    print(f"{desc}: loaded in {t1 - t0:.0f}s", flush=True)
+    gib = lambda n: f"{n / 2**30:.1f} GiB"  # noqa: E731
+
+    def report(f: int) -> None:
+        if torch.cuda.is_available() and f % 15 == 0:
+            print(f"  frame {f}: {gib(torch.cuda.memory_allocated())} allocated, {gib(torch.cuda.memory_reserved())} reserved", flush=True)
+
+    data = segment(predictor, path, [{"id": "p0", "text": concept}], on_frame=report)
     t2 = time.time()
     objects = data["results"][0]["objects"]
     dets = sum(len(o["detections"]) for o in objects)
-    print(f"{desc}: loaded in {t1 - t0:.0f}s")
     print(f'"{concept}" on {frames} frames: {len(objects)} tracked objects, {dets} masks, {t2 - t1:.1f}s ({frames / max(t2 - t1, 1e-6):.1f} frames/s)')
     if torch.cuda.is_available():
         print(f"peak GPU memory {torch.cuda.max_memory_allocated() / 2**30:.1f} GiB")

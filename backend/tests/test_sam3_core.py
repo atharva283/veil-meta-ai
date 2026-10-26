@@ -74,6 +74,22 @@ def test_segment_tracks_ids_through_the_clip_and_closes_the_session():
     assert pred.closed == 1
 
 
+def test_segment_streams_without_caching_and_prunes_old_tracker_frames(monkeypatch):
+    """Only the last KEEP_FRAMES frames of tracker state stay in memory during a forward pass."""
+    monkeypatch.setattr(sam3_core, "KEEP_FRAMES", 2)
+    pred = FakePredictor()
+    frames = {f: object() for f in range(4)}
+    tracker = {"output_dict": {"non_cond_frame_outputs": dict(frames)}, "output_dict_per_obj": {0: {"non_cond_frame_outputs": dict(frames)}}}
+    pred._all_inference_states = {"s1": {"state": {"sam2_inference_states": [tracker]}}}
+    seen = []
+    sam3_core.segment(pred, "clip.mp4", [{"id": "p0", "text": "face"}], on_frame=seen.append)
+    stream = next(r for r in pred.requests if r["type"] == "propagate_in_video")
+    assert stream["evict_cached_frame_outputs"] is True
+    assert seen == [1, 2, 3]
+    assert sorted(tracker["output_dict"]["non_cond_frame_outputs"]) == [2, 3]  # 0 and 1 dropped at frames 2 and 3
+    assert sorted(tracker["output_dict_per_obj"][0]["non_cond_frame_outputs"]) == [2, 3]
+
+
 def test_refine_prompts_the_box_center_as_a_relative_point():
     pred = FakePredictor()
     data = sam3_core.refine(pred, "clip.mp4", [{"id": "r0", "text": "face", "frame_index": 2, "box": [28, 18, 44, 34], "window": 5}], W, H)
