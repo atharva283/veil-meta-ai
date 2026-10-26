@@ -87,3 +87,4 @@ def test_cache_only_mode_refuses_uncached_work(run, street, sample_cache, monkey
     ok = client.post("/api/jobs", json={"video_id": street.id, "instruction": DEMO})
     assert ok.status_code == 200 and ok.json()["replay"] is not None
     assert client.post("/api/videos", files={"file": ("x.mp4", b"0", "video/mp4")}).status_code == 409
+    assert client.post("/api/plan", json={"instruction": DEMO}).status_code == 409  # no planner calls either

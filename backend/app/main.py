@@ -103,6 +103,8 @@ class PlanPreview(BaseModel):
 
 @app.post("/api/plan")
 def preview_plan(body: PlanPreview) -> dict:
+    if settings.cache_only:  # would call the planner model
+        raise HTTPException(409, "Plan previews are off on this demo. Pick a sample to replay a precomputed run.")
     parent = jobs.get(body.parent_job_id) if body.parent_job_id else None
     try:
         plan, fallback = make_plan(body.instruction, parent.plan if parent else None)
