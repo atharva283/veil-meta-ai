@@ -142,11 +142,15 @@ def _drop_unknown_init_kwargs(model) -> None:
 # -- inference ---------------------------------------------------------------
 
 
-def _collect(objects: dict, frame_idx: int, outputs: dict, threshold: float, only_obj: int | None = None) -> None:
-    """Fold one frame of predictor output into {obj_id: {frame: detection}}."""
+def _collect(objects: dict, frame_idx: int, outputs: dict, threshold: float, only_obj: int | None = None, offset: int = 0) -> None:
+    """Fold one frame of predictor output into {obj_id: {frame: detection}}.
+
+    `offset` turns a piece's frame numbers back into the clip's.
+    """
     import numpy as np
 
     ids, probs, masks = outputs["out_obj_ids"], outputs["out_probs"], outputs["out_binary_masks"]
+    f = int(frame_idx) + offset
     for k in range(len(ids)):
         oid, score = int(ids[k]), float(probs[k])
         if (only_obj is not None and oid != only_obj) or score < threshold:
@@ -155,8 +159,8 @@ def _collect(objects: dict, frame_idx: int, outputs: dict, threshold: float, onl
         if len(xs) == 0:
             continue
         x0, y0, x1, y1 = int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
-        objects.setdefault(oid, {})[int(frame_idx)] = {
-            "f": int(frame_idx), "score": round(score, 4), "box": [x0, y0, x1, y1],
+        objects.setdefault(oid, {})[f] = {
+            "f": f, "score": round(score, 4), "box": [x0, y0, x1, y1],
             "rle": rle_encode(masks[k][y0:y1, x0:x1]),
         }  # fmt: skip
 
@@ -177,6 +181,105 @@ def _start(predictor, video_path: str) -> str:
 
 def _objects(found: dict) -> list[dict]:
     return [{"obj_id": oid, "detections": [d for _, d in sorted(frames.items())]} for oid, frames in sorted(found.items())]
+
+
+# -- pieces --------------------------------------------------------------------
+# sam3 decodes a whole video into memory as float32 at 1008x1008 (~12 MB a frame) before
+# tracking starts: ~5 GB for a 13 s clip, which with the model and Ollama overruns Colab's
+# 12.7 GB of RAM. Long clips are tracked in pieces of `_piece_frames()` frames that share
+# their boundary frame, and objects are joined across it by box overlap.
+
+
+def _piece_frames() -> int:
+    import os
+
+    return max(2, int(os.environ.get("VEIL_SAM_PIECE", "150")))
+
+
+def _count_frames(video_path: str) -> int:
+    import cv2
+
+    cap = cv2.VideoCapture(video_path)
+    n = 0
+    while cap.grab():
+        n += 1
+    cap.release()
+    return n
+
+
+def _pieces(n: int, size: int) -> list[tuple[int, int]]:
+    """[start, end) ranges covering n frames, each sharing its first frame with the previous one."""
+    out, start = [], 0
+    while True:
+        end = min(start + size, n)
+        out.append((start, end))
+        if end >= n:
+            return out
+        start = end - 1
+
+
+def _write_pieces(video_path: str, ranges: list[tuple[int, int]], folder: str) -> list[str]:
+    """Write each frame range to its own near-lossless MJPEG .avi in one pass over the clip."""
+    import os
+
+    import cv2
+
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    size = (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+    paths = [os.path.join(folder, f"piece{i:03d}.avi") for i in range(len(ranges))]
+    writers: dict = {}
+    last = max(e for _, e in ranges)
+    f = 0
+    while f < last:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        for i, (s, e) in enumerate(ranges):
+            if s <= f < e:
+                if i not in writers:
+                    w = cv2.VideoWriter(paths[i], cv2.VideoWriter_fourcc(*"MJPG"), fps, size)
+                    w.set(cv2.VIDEOWRITER_PROP_QUALITY, 97)
+                    writers[i] = w
+                writers[i].write(frame)
+                if f == e - 1:
+                    writers.pop(i).release()
+        f += 1
+    for w in writers.values():
+        w.release()
+    cap.release()
+    return paths
+
+
+def _box_iou(a, b) -> float:
+    ix = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _join(found: dict, piece: dict, at: int) -> None:
+    """Merge a piece's objects into `found`, continuing the ids of objects seen on frame `at`."""
+    ends = {oid: frames[at]["box"] for oid, frames in found.items() if at in frames}
+    next_id = max(found, default=0) + 1
+    # Best overlaps first, so two new objects can't claim the same old one.
+    pairs = sorted(
+        ((_box_iou(ends[o], frames[at]["box"]), o, n) for n, frames in piece.items() if at in frames for o in ends),
+        reverse=True,
+    )
+    mapping: dict[int, int] = {}
+    for iou, old, new in pairs:
+        if iou < 0.5:
+            break
+        if new not in mapping and old not in mapping.values():
+            mapping[new] = old
+    for new, frames in sorted(piece.items()):
+        if new not in mapping:
+            mapping[new], next_id = next_id, next_id + 1
+        dest = found.setdefault(mapping[new], {})
+        for f, det in frames.items():
+            dest.setdefault(f, det)  # the boundary frame keeps the earlier piece's mask
 
 
 def _prune(predictor, session: str, frame_idx: int) -> None:
@@ -204,65 +307,97 @@ def _free_cuda() -> None:
         torch.cuda.empty_cache()
 
 
-def segment(predictor, video_path: str, prompts: list[dict], threshold: float = 0.45, on_frame=None) -> dict:
-    """Text-prompt each concept on frame 0 and track every instance through the clip.
-
-    Objects that enter later are picked up as propagation reaches them. `on_frame(frame_idx)`
-    is called after each frame (the smoke test uses it to report memory).
-    """
-    session = _start(predictor, video_path)
-    results = []
+def _track(predictor, path: str, prompts: list[dict], threshold: float, offset: int, on_frame) -> dict:
+    """One session over one video file: {prompt id: {obj_id: {frame: detection}}}."""
+    session = _start(predictor, path)
+    found: dict = {}
     try:
         for p in prompts:
-            found: dict = {}
+            objs = found[p["id"]] = {}
             # A new text prompt resets the session's tracking state.
             out = predictor.handle_request(request={
                 "type": "add_prompt", "session_id": session, "frame_index": 0, "text": p["text"], "output_prob_thresh": threshold,
             })  # fmt: skip
-            _collect(found, out["frame_index"], out["outputs"], threshold)
+            _collect(objs, out["frame_index"], out["outputs"], threshold, offset=offset)
             # evict_cached_frame_outputs: drop each frame's full-resolution masks once they're
             # streamed to us instead of keeping them on the GPU for the rest of the session.
             for r in predictor.handle_stream_request(request={
                 "type": "propagate_in_video", "session_id": session, "propagation_direction": "forward",
                 "start_frame_index": 0, "output_prob_thresh": threshold, "evict_cached_frame_outputs": True,
             }):  # fmt: skip
-                _collect(found, r["frame_index"], r["outputs"], threshold)
+                _collect(objs, r["frame_index"], r["outputs"], threshold, offset=offset)
                 _prune(predictor, session, r["frame_index"])
                 if on_frame:
-                    on_frame(r["frame_index"])
-            results.append({"id": p["id"], "objects": _objects(found)})
+                    on_frame(r["frame_index"] + offset)
     finally:
         predictor.handle_request(request={"type": "close_session", "session_id": session})
         _free_cuda()
-    return {"tracked": True, "results": results}
+    return found
+
+
+def segment(predictor, video_path: str, prompts: list[dict], threshold: float = 0.45, on_frame=None) -> dict:
+    """Text-prompt each concept on frame 0 and track every instance through the clip.
+
+    Objects that enter later are picked up as propagation reaches them; long clips are
+    tracked in pieces (see `_piece_frames`). `on_frame(frame_idx)` is called after each
+    frame (the smoke test uses it to report memory).
+    """
+    import shutil
+    import tempfile
+
+    ranges = _pieces(_count_frames(video_path), _piece_frames())
+    if len(ranges) == 1:
+        found = _track(predictor, video_path, prompts, threshold, 0, on_frame)
+    else:
+        folder = tempfile.mkdtemp(prefix="veil-pieces-")
+        try:
+            found = {p["id"]: {} for p in prompts}
+            for (start, _), path in zip(ranges, _write_pieces(video_path, ranges, folder)):
+                for pid, objs in _track(predictor, path, prompts, threshold, start, on_frame).items():
+                    _join(found[pid], objs, start)
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+    return {"tracked": True, "results": [{"id": p["id"], "objects": _objects(found[p["id"]])} for p in prompts]}
 
 
 def refine(predictor, video_path: str, requests: list[dict], width: int, height: int) -> dict:
     """Follow one object per request from a point prompt, `window` frames either side.
 
-    The point is the request's "point" (pixels) or the center of its "box".
+    The point is the request's "point" (pixels) or the center of its "box". On a long
+    clip only the window around the request is loaded.
     """
-    session = _start(predictor, video_path)
+    import shutil
+    import tempfile
+
+    n = _count_frames(video_path)
+    folder = tempfile.mkdtemp(prefix="veil-refine-")
     results = []
     try:
         for r in requests:
             x, y = r.get("point") or ((r["box"][0] + r["box"][2]) / 2, (r["box"][1] + r["box"][3]) / 2)
-            predictor.handle_request(request={"type": "reset_session", "session_id": session})
+            start, end = 0, n
+            if n > _piece_frames():
+                start, end = max(0, r["frame_index"] - r["window"]), min(n, r["frame_index"] + r["window"] + 1)
+            path = video_path if (start, end) == (0, n) else _write_pieces(video_path, [(start, end)], folder)[0]
+            session = _start(predictor, path)
             found: dict = {}
-            out = predictor.handle_request(request={
-                "type": "add_prompt", "session_id": session, "frame_index": r["frame_index"], "obj_id": 1,
-                "points": [[x / width, y / height]], "point_labels": [1], "rel_coordinates": True,
-            })  # fmt: skip
-            _collect(found, out["frame_index"], out["outputs"], 0.0, only_obj=1)
-            for o in predictor.handle_stream_request(request={
-                "type": "propagate_in_video", "session_id": session, "propagation_direction": "both",
-                "start_frame_index": r["frame_index"], "max_frame_num_to_track": r["window"],
-            }):  # fmt: skip
-                _collect(found, o["frame_index"], o["outputs"], 0.0, only_obj=1)
+            try:
+                out = predictor.handle_request(request={
+                    "type": "add_prompt", "session_id": session, "frame_index": r["frame_index"] - start, "obj_id": 1,
+                    "points": [[x / width, y / height]], "point_labels": [1], "rel_coordinates": True,
+                })  # fmt: skip
+                _collect(found, out["frame_index"], out["outputs"], 0.0, only_obj=1, offset=start)
+                for o in predictor.handle_stream_request(request={
+                    "type": "propagate_in_video", "session_id": session, "propagation_direction": "both",
+                    "start_frame_index": r["frame_index"] - start, "max_frame_num_to_track": r["window"],
+                }):  # fmt: skip
+                    _collect(found, o["frame_index"], o["outputs"], 0.0, only_obj=1, offset=start)
+            finally:
+                predictor.handle_request(request={"type": "close_session", "session_id": session})
+                _free_cuda()
             results.append({"id": r["id"], "objects": _objects(found)})
     finally:
-        predictor.handle_request(request={"type": "close_session", "session_id": session})
-        _free_cuda()
+        shutil.rmtree(folder, ignore_errors=True)
     return {"tracked": True, "results": results}
 
 

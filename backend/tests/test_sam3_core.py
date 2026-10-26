@@ -90,6 +90,46 @@ def test_segment_streams_without_caching_and_prunes_old_tracker_frames(monkeypat
     assert sorted(tracker["output_dict_per_obj"][0]["non_cond_frame_outputs"]) == [2, 3]
 
 
+def _video(path, n):
+    import cv2
+
+    w = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 10, (W, H))
+    for i in range(n):
+        w.write(np.full((H, W, 3), i * 20, dtype=np.uint8))
+    w.release()
+    return str(path)
+
+
+def test_long_clip_is_tracked_in_pieces_joined_at_the_shared_frame(monkeypatch, tmp_path):
+    """Pieces of 4 frames over 10 share frames 3 and 6; object 1 keeps one id across both seams."""
+    monkeypatch.setenv("VEIL_SAM_PIECE", "4")
+    clip = _video(tmp_path / "clip.mp4", 10)
+    assert sam3_core._pieces(10, 4) == [(0, 4), (3, 7), (6, 10)]
+    pred = FakePredictor()
+    seen = []
+    data = sam3_core.segment(pred, clip, [{"id": "p0", "text": "face"}], on_frame=seen.append)
+    by_id = {o["obj_id"]: [d["f"] for d in o["detections"]] for o in data["results"][0]["objects"]}
+    assert by_id[1] == list(range(10))
+    # Object 2 first appears mid-piece, so each piece's copy is a new object (nothing to continue).
+    assert sorted(by_id.values())[1:] == [[2], [5], [8]]
+    assert seen == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    starts = [r for r in pred.requests if r["type"] == "start_session"]
+    assert len(starts) == 3 and pred.closed == 3
+    assert all(r["resource_path"].endswith(".avi") for r in starts)
+    assert not any(Path(r["resource_path"]).exists() for r in starts)  # pieces are cleaned up
+
+
+def test_refine_on_a_long_clip_loads_only_the_window(monkeypatch, tmp_path):
+    monkeypatch.setenv("VEIL_SAM_PIECE", "4")
+    clip = _video(tmp_path / "clip.mp4", 10)
+    pred = FakePredictor()
+    data = sam3_core.refine(pred, clip, [{"id": "r0", "frame_index": 6, "box": [28, 18, 44, 34], "window": 2}], W, H)
+    prompt = next(r for r in pred.requests if r["type"] == "add_prompt")
+    assert prompt["frame_index"] == 2  # frame 6 of the clip is frame 2 of the piece [4, 9)
+    frames = [d["f"] for d in data["results"][0]["objects"][0]["detections"]]
+    assert frames == [5, 6, 7]  # the fake answers on piece frames 1-3
+
+
 def test_refine_prompts_the_box_center_as_a_relative_point():
     pred = FakePredictor()
     data = sam3_core.refine(pred, "clip.mp4", [{"id": "r0", "text": "face", "frame_index": 2, "box": [28, 18, 44, 34], "window": 5}], W, H)
