@@ -57,6 +57,10 @@ class Entry:
     frozen_at: str
 
 
+class MockRunError(ValueError):
+    """A run used a mock model, so it can't be frozen."""
+
+
 class SampleCache:
     def __init__(self, root: Path):
         self.root = root
@@ -86,7 +90,7 @@ class SampleCache:
         snap = json.loads((job_dir / "job.json").read_text(encoding="utf-8"))
         mocked = [m for k, m in snap["modes"].items() if "mock" in m and not (allow_mock_planner and k == "planner")]
         if mocked and not allow_mock:
-            raise ValueError(f"{job_dir.name} ran on {', '.join(mocked)}; pass --allow-mock to cache it anyway")
+            raise MockRunError(f"{job_dir.name} ran on {', '.join(mocked)}; pass --allow-mock to cache it anyway")
         entries = self._entries()
         parent_key = None
         if snap["parent_job_id"]:
@@ -117,9 +121,14 @@ def build(allow_mock: bool, clips: list[str] | None = None, max_prompts: int | N
     from .videos import store
 
     store.load_samples()
-    for video in store.samples():
-        if video.annotations is not None:
-            continue  # synthetic clips are test fixtures
+    real = [v for v in store.samples() if v.annotations is None]  # synthetic clips are test fixtures
+    if clips:
+        unknown = sorted(set(clips) - {v.id.removeprefix("sample-") for v in real})
+        if unknown:
+            raise SystemExit(f"unknown clip(s): {', '.join(unknown)}; have {', '.join(v.id.removeprefix('sample-') for v in real)}")
+    if not allow_mock:
+        _preflight()
+    for video in real:
         if clips and video.id.removeprefix("sample-") not in clips:
             continue
         first = None
@@ -131,6 +140,19 @@ def build(allow_mock: bool, clips: list[str] | None = None, max_prompts: int | N
             _run_and_freeze(jobs, video, prompt, first.id, allow_mock, allow_mock_planner)
 
 
+def _preflight() -> None:
+    """Fail before hours of GPU time rather than after: these settings would get every run refused."""
+    from .auditor import get_auditor
+    from .segmenter import get_segmenter
+
+    if not settings.segmenter_live:
+        raise SystemExit("segmenter is the mock: set VEIL_SAM_LOCAL=1 (local GPU) or MODAL_ENDPOINT, or pass --allow-mock")
+    if settings.auditor_live and not settings.auditor_off and any(h in settings.auditor_base for h in ("localhost", "127.0.0.1")):
+        # The planner's local Ollama endpoint doesn't serve Muse Spark; every audit would fall back to the mock.
+        raise SystemExit(f"no Muse Spark at {settings.auditor_base}: set VEIL_AUDITOR=none to audit with the SAM re-check only")
+    print(f"segmenter: {get_segmenter().name} · auditor: {get_auditor().name} · planner: {settings.planner_model if settings.planner_live else 'rule-based'}", flush=True)
+
+
 def _run_and_freeze(jobs, video, instruction: str, parent_job_id: str | None, allow_mock: bool, allow_mock_planner: bool):
     t0 = time.time()
     job = jobs.run_now(video.id, instruction, parent_job_id)
@@ -139,6 +161,9 @@ def _run_and_freeze(jobs, video, instruction: str, parent_job_id: str | None, al
         return job, None
     try:
         entry = sample_cache.freeze(jobs.jobs_dir / job.id, allow_mock=allow_mock, allow_mock_planner=allow_mock_planner)
+    except MockRunError as exc:
+        # The same settings would get every later run refused too.
+        raise SystemExit(f"STOPPED  {video.id}: {instruction!r}: {exc}") from None
     except ValueError as exc:
         print(f"SKIPPED  {video.id}: {instruction!r}: {exc}")
         return job, None

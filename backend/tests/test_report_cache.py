@@ -88,3 +88,24 @@ def test_cache_only_mode_refuses_uncached_work(run, street, sample_cache, monkey
     assert ok.status_code == 200 and ok.json()["replay"] is not None
     assert client.post("/api/videos", files={"file": ("x.mp4", b"0", "video/mp4")}).status_code == 409
     assert client.post("/api/plan", json={"instruction": DEMO}).status_code == 409  # no planner calls either
+
+
+def test_build_fails_fast_on_settings_that_would_get_every_run_refused(monkeypatch, tmp_path):
+    with pytest.raises(SystemExit, match="unknown clip"):
+        cache_mod.build(allow_mock=False, clips=["manchester"])
+    with pytest.raises(SystemExit, match="VEIL_SAM_LOCAL"):  # tests run with the mock segmenter
+        cache_mod.build(allow_mock=False, clips=["desk_inbox"])
+    ollama = dataclasses.replace(
+        cache_mod.settings, sam_local=True, force_mock=frozenset(), meta_api_key="ollama", meta_api_base="http://localhost:11434/v1"
+    )
+    monkeypatch.setattr(cache_mod, "settings", ollama)
+    with pytest.raises(SystemExit, match="VEIL_AUDITOR=none"):
+        cache_mod._preflight()
+
+
+def test_build_stops_at_the_first_run_refused_for_mocks(monkeypatch, tmp_path):
+    monkeypatch.setattr(cache_mod, "_preflight", lambda: None)
+    monkeypatch.setattr(cache_mod, "sample_cache", SampleCache(tmp_path))
+    with pytest.raises(SystemExit, match="STOPPED"):
+        cache_mod.build(allow_mock=False, clips=["desk_inbox", "manchester_street"], max_prompts=1)
+    assert not (tmp_path / "manifest.json").exists()
