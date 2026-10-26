@@ -9,7 +9,8 @@ Setup:
      with the account whose token you use.
   2. modal secret create veil-sam3 HF_TOKEN=hf_xxx VEIL_TOKEN=<any string>
      (VEIL_TOKEN must match MODAL_AUTH_TOKEN in .env).
-  3. modal deploy, then check $MODAL_ENDPOINT/health ("ok": true once weights load) and:
+  3. modal deploy, then check $MODAL_ENDPOINT/health ("ok": true once weights load;
+     send the bearer token to see load errors) and:
        curl -H "Authorization: Bearer $TOKEN" \
             -F video=@demo_assets/clips/street_crossing.mp4 \
             -F 'payload={"prompts":[{"id":"p0","text":"face"}]}' \
@@ -163,8 +164,11 @@ class Sam3Service:
             return size
 
         @api.get("/health")
-        def health():
-            return {"ok": self.predictor is not None, "model": "sam3.1", "commit": SAM_COMMIT, "gpu": GPU, "error": self.load_error}
+        def health(authorization: str | None = Header(None)):
+            status = {"ok": self.predictor is not None}
+            if not token or authorization == f"Bearer {token}":  # load errors only for the token holder
+                status.update(model="sam3.1", commit=SAM_COMMIT, gpu=GPU, error=self.load_error)
+            return status
 
         @api.post("/segment")
         async def segment(video: UploadFile = File(...), payload: str = Form(...), authorization: str | None = Header(None)):
