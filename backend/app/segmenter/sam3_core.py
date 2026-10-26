@@ -98,6 +98,9 @@ def load_predictor(precision: str = "auto"):
     predictor = build_sam3_predictor(version="sam3.1", use_fa3=False, max_num_objects=MAX_OBJECTS)
     _drop_unknown_init_kwargs(predictor.model)
     if _offload():
+        # The builder runs the detector on 16 frames at once; on a T4 one batch's ViT activations
+        # alone are ~1.3 GB at a time. Same detections in smaller chunks (VEIL_SAM_BATCH overrides).
+        predictor.model.batched_grounding_batch_size = int(os.environ.get("VEIL_SAM_BATCH", "4"))
         # Post-process one frame at a time instead of 16 (upstream: "set to 1 to disable batching");
         # a batch holds 16 frames of full-resolution masks for every object on the GPU at once.
         predictor.model.postprocess_batch_size = 1
