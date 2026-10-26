@@ -9,7 +9,18 @@ from .muse_spark import MuseSparkAuditor
 mock_auditor = MockAuditor(mock_segmenter)
 
 
+class NoSampledAuditor:
+    """VEIL_AUDITOR=none: no vision model on sampled frames; the SAM re-check of every frame still runs."""
+
+    name = "none (SAM re-check only)"
+
+    def audit(self, video, samples, policy) -> list:
+        return []
+
+
 def get_auditor() -> Auditor:
+    if settings.auditor_off:
+        return NoSampledAuditor()
     return MuseSparkAuditor() if settings.auditor_live else mock_auditor
 
 

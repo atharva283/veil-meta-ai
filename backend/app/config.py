@@ -49,10 +49,15 @@ class Settings:
     auditor_api_base: str = field(default_factory=lambda: _env("AUDITOR_API_BASE"))
     auditor_api_key: str = field(default_factory=lambda: _env("AUDITOR_API_KEY"))
     auditor_model: str = field(default_factory=lambda: _env("AUDITOR_MODEL", "muse-spark"))
+    # VEIL_AUDITOR=none skips the sampled-frame vision audit (the SAM re-check still runs).
+    auditor_off: bool = field(default_factory=lambda: _env("VEIL_AUDITOR").lower() == "none")
 
     # SAM 3.1 service deployed on Modal (see backend/modal_app/sam3_service.py).
     modal_endpoint: str = field(default_factory=lambda: _env("MODAL_ENDPOINT").rstrip("/"))
     modal_auth_token: str = field(default_factory=lambda: _env("MODAL_AUTH_TOKEN"))
+    # Or run SAM 3.1 in this process on a local GPU (Colab/Kaggle); see segmenter/local_sam.py.
+    sam_local: bool = field(default_factory=lambda: _env("VEIL_SAM_LOCAL").lower() in ("1", "true", "yes"))
+    sam_precision: str = field(default_factory=lambda: _env("VEIL_SAM_PRECISION", "auto"))
 
     # Comma-separated list of components to keep on mocks even when keys exist,
     # e.g. VEIL_FORCE_MOCK=auditor while Muse Spark access is pending.
@@ -80,7 +85,7 @@ class Settings:
 
     @property
     def segmenter_live(self) -> bool:
-        return bool(self.modal_endpoint) and "segmenter" not in self.force_mock
+        return (self.sam_local or bool(self.modal_endpoint)) and "segmenter" not in self.force_mock
 
     @property
     def auditor_live(self) -> bool:

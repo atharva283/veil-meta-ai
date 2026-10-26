@@ -49,7 +49,7 @@ def health() -> dict:
         "ok": True,
         "modes": {
             "planner": _mode(settings.planner_live, settings.planner_model, "mock planner"),
-            "segmenter": _mode(settings.segmenter_live, "SAM 3.1 on Modal", "mock SAM 3.1"),
+            "segmenter": _mode(settings.segmenter_live, "SAM 3.1 (local GPU)" if settings.sam_local else "SAM 3.1 on Modal", "mock SAM 3.1"),
             "auditor": _mode(settings.auditor_live, settings.auditor_model, "mock Muse Spark"),
         },
         "samples": len(store.samples()),

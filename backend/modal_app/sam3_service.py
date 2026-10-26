@@ -17,18 +17,16 @@ Setup:
             $MODAL_ENDPOINT/segment
 
 Weights download once into the "veil-sam3-cache" Volume, so later cold starts
-skip the download.
+skip the download. Modal needs a payment method on the account for any GPU;
+without one, run SAM 3.1 in-process instead (notebooks/veil_colab_runner.ipynb).
 
 API contract (mirrors backend/app/segmenter/modal_sam.py):
   POST /segment  multipart: video=<mp4>, payload={"prompts":[{"id","text"}], "score_threshold"}
   POST /refine   multipart: video=<mp4>, payload={"requests":[{"id","text","frame_index","box","point"?,"window"}]}
   -> {"tracked": true, "results": [{"id", "objects": [{"obj_id", "detections": [{"f","score","box","rle"}]}]}]}
 
-/segment runs SAM 3.1's video predictor: a text prompt detects every instance
-and the tracker follows each one with a stable id through the whole clip
-(objects entering later are picked up as propagation reaches them).
-/refine follows one object from a point prompt (the flagged box's center, or
-an explicit "point" in pixels), `window` frames each way.
+The model calls live in backend/app/segmenter/sam3_core.py, shared with
+in-process runs; this file only adds the GPU container and the HTTP layer.
 """
 
 from __future__ import annotations
@@ -36,12 +34,13 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from pathlib import Path
 
 import modal
 
-SAM_COMMIT = "f1647e8d0c1d280991f4d1b7d974c2704537fe66"  # facebookresearch/sam3 main, 2026-10-23
-GPU = "A10G"  # 24 GB Ampere: enough for SAM 3.1; Flash-Attention 3 kernels need Hopper, so they are off below
-MAX_OBJECTS = 64  # per prompt; SAM 3.1's default of 16 is too few for a crowd
+CORE = Path(__file__).resolve().parent.parent / "app" / "segmenter" / "sam3_core.py"
+SAM_COMMIT = "f1647e8d0c1d280991f4d1b7d974c2704537fe66"  # keep in step with sam3_core.SAM_COMMIT
+GPU = "A10G"  # 24 GB Ampere: plenty for SAM 3.1, and native bf16
 
 cache = modal.Volume.from_name("veil-sam3-cache", create_if_missing=True)
 
@@ -64,21 +63,10 @@ image = (
     )
     .pip_install(f"git+https://github.com/facebookresearch/sam3.git@{SAM_COMMIT}")
     .env({"HF_HOME": "/cache/hf"})  # huggingface_hub reads HF_TOKEN from the secret
+    .add_local_file(CORE, "/root/sam3_core.py")
 )
 
 app = modal.App("veil-sam3", image=image)
-
-
-def rle_encode(mask):
-    """Row-major run lengths over the crop, starting with a run of zeros."""
-    import numpy as np
-
-    flat = mask.astype(np.uint8).ravel()
-    if flat.size == 0:
-        return []
-    changes = np.flatnonzero(np.diff(flat)) + 1
-    runs = np.diff(np.concatenate(([0], changes, [flat.size]))).tolist()
-    return runs if flat[0] == 0 else [0, *runs]
 
 
 @app.cls(
@@ -91,53 +79,19 @@ def rle_encode(mask):
 class Sam3Service:
     @modal.enter()
     def load(self):
-        import torch
+        import sam3_core
 
         self.predictor, self.load_error = None, ""
         try:
-            from sam3.model_builder import build_sam3_predictor
-
-            torch.backends.cuda.matmul.allow_tf32 = True
-            self.predictor = build_sam3_predictor(version="sam3.1", use_fa3=False, max_num_objects=MAX_OBJECTS)
+            self.predictor, _ = sam3_core.load_predictor("auto")
             cache.commit()
         except Exception as exc:  # usually: this HF account isn't approved for facebook/sam3.1 yet
             self.load_error = f"{type(exc).__name__}: {exc}"[:600]
 
-    # -- model calls ---------------------------------------------------------
-
-    def _request(self, **req):
-        return self.predictor.handle_request(request=req)
-
-    def _stream(self, **req):
-        return self.predictor.handle_stream_request(request=req)
-
-    @staticmethod
-    def _collect(objects: dict, frame_idx: int, outputs: dict, threshold: float, only_obj: int | None = None) -> None:
-        """Fold one frame of predictor output into {obj_id: {frame: detection}}."""
-        import numpy as np
-
-        ids, probs, masks = outputs["out_obj_ids"], outputs["out_probs"], outputs["out_binary_masks"]
-        for k in range(len(ids)):
-            oid, score = int(ids[k]), float(probs[k])
-            if (only_obj is not None and oid != only_obj) or score < threshold:
-                continue
-            ys, xs = np.nonzero(masks[k])
-            if len(xs) == 0:
-                continue
-            x0, y0, x1, y1 = int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
-            objects.setdefault(oid, {})[int(frame_idx)] = {
-                "f": int(frame_idx), "score": round(score, 4), "box": [x0, y0, x1, y1],
-                "rle": rle_encode(masks[k][y0:y1, x0:x1]),
-            }  # fmt: skip
-
-    @staticmethod
-    def _objects(found: dict) -> list[dict]:
-        return [{"obj_id": oid, "detections": [d for _, d in sorted(frames.items())]} for oid, frames in sorted(found.items())]
-
-    # -- HTTP ----------------------------------------------------------------
-
     @modal.asgi_app()
     def web(self):
+        import cv2
+        import sam3_core
         from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 
         api = FastAPI(title="veil-sam3")
@@ -155,14 +109,6 @@ class Sam3Service:
             tmp.close()
             return tmp.name
 
-        def frame_size(path: str) -> tuple[int, int]:
-            import cv2
-
-            cap = cv2.VideoCapture(path)
-            size = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            cap.release()
-            return size
-
         @api.get("/health")
         def health(authorization: str | None = Header(None)):
             status = {"ok": self.predictor is not None}
@@ -174,49 +120,22 @@ class Sam3Service:
         async def segment(video: UploadFile = File(...), payload: str = Form(...), authorization: str | None = Header(None)):
             check(authorization)
             body = json.loads(payload)
-            threshold = float(body.get("score_threshold", 0.45))
             path = await save(video)
-            session = self._request(type="start_session", resource_path=path)["session_id"]
-            results = []
             try:
-                for p in body["prompts"]:
-                    found: dict = {}
-                    # A new text prompt resets the session's tracking state.
-                    out = self._request(type="add_prompt", session_id=session, frame_index=0, text=p["text"], output_prob_thresh=threshold)
-                    self._collect(found, out["frame_index"], out["outputs"], threshold)
-                    for r in self._stream(type="propagate_in_video", session_id=session, propagation_direction="forward",
-                                          start_frame_index=0, output_prob_thresh=threshold):  # fmt: skip
-                        self._collect(found, r["frame_index"], r["outputs"], threshold)
-                    results.append({"id": p["id"], "objects": self._objects(found)})
+                return sam3_core.segment(self.predictor, path, body["prompts"], float(body.get("score_threshold", 0.45)))
             finally:
-                self._request(type="close_session", session_id=session)
                 os.unlink(path)
-            return {"tracked": True, "results": results}
 
         @api.post("/refine")
         async def refine(video: UploadFile = File(...), payload: str = Form(...), authorization: str | None = Header(None)):
-            """Follow one object from a point prompt, `window` frames either side of frame_index."""
             check(authorization)
-            reqs = json.loads(payload)["requests"]
             path = await save(video)
-            W, H = frame_size(path)
-            session = self._request(type="start_session", resource_path=path)["session_id"]
-            results = []
             try:
-                for r in reqs:
-                    x, y = r.get("point") or ((r["box"][0] + r["box"][2]) / 2, (r["box"][1] + r["box"][3]) / 2)
-                    self._request(type="reset_session", session_id=session)
-                    found: dict = {}
-                    out = self._request(type="add_prompt", session_id=session, frame_index=r["frame_index"], obj_id=1,
-                                        points=[[x / W, y / H]], point_labels=[1], rel_coordinates=True)  # fmt: skip
-                    self._collect(found, out["frame_index"], out["outputs"], 0.0, only_obj=1)
-                    for o in self._stream(type="propagate_in_video", session_id=session, propagation_direction="both",
-                                          start_frame_index=r["frame_index"], max_frame_num_to_track=r["window"]):  # fmt: skip
-                        self._collect(found, o["frame_index"], o["outputs"], 0.0, only_obj=1)
-                    results.append({"id": r["id"], "objects": self._objects(found)})
+                cap = cv2.VideoCapture(path)
+                W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                cap.release()
+                return sam3_core.refine(self.predictor, path, json.loads(payload)["requests"], W, H)
             finally:
-                self._request(type="close_session", session_id=session)
                 os.unlink(path)
-            return {"tracked": True, "results": results}
 
         return api
