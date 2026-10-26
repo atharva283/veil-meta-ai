@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Employee badge</title>
+<!--
+  Badge prop for the Veil desk shot: a small printed face is the kind of thing a first
+  segmentation pass can miss and the audit then catches.
+  Use a photo of yourself (or someone who has agreed to appear). Click the photo area to
+  pick it: the image stays in this browser and is never uploaded.
+  Print at 100% scale ("Actual size") for a credit-card-sized badge (85.6 x 54 mm), or
+  show it on a second screen. The name and ID are fictional and match mock_screen.html.
+-->
+<style>
+  :root { --ink: #15171a; --muted: #4a4f57; --brand: #e8590c; --navy: #1f2a44; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", -apple-system, Roboto, Helvetica, Arial, sans-serif; background: #e9e6e0; color: var(--ink);
+         min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 16px; }
+  .card { width: 85.6mm; height: 54mm; background: #fff; border-radius: 3.2mm; overflow: hidden; display: grid;
+          grid-template-columns: 27mm 1fr; grid-template-rows: 9mm 1fr 7mm; box-shadow: 0 8px 30px rgba(0,0,0,.18);
+          transform: scale(var(--zoom, 2.2)); transform-origin: center; margin: calc(54mm * (var(--zoom, 2.2) - 1) / 2) 0; }
+  .band { grid-column: 1 / -1; background: var(--navy); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 3.5mm; }
+  .brand { font-weight: 800; letter-spacing: .5mm; font-size: 3.4mm; display: flex; align-items: center; gap: 1.6mm; }
+  .brand i { width: 4.2mm; height: 4.2mm; border-radius: 1mm; background: var(--brand); display: inline-block; }
+  .level { font-size: 2.4mm; font-weight: 700; background: #d92d20; padding: .6mm 1.8mm; border-radius: 4mm; }
+  .photo { grid-row: 2 / 3; margin: 2.6mm 0 2.6mm 3.5mm; border-radius: 1.6mm; background: #dfe3ea center / cover no-repeat;
+           display: grid; place-items: center; cursor: pointer; border: .3mm solid #c9ced8; overflow: hidden; }
+  .photo svg { width: 70%; opacity: .55; }
+  .photo.has-image svg { display: none; }
+  .info { grid-row: 2 / 3; padding: 3.2mm 3.5mm 0 3.2mm; display: flex; flex-direction: column; gap: .9mm; }
+  .name { font-size: 4.3mm; font-weight: 800; line-height: 1.05; }
+  .role { font-size: 2.6mm; color: var(--muted); font-weight: 600; }
+  .field { font-size: 2.3mm; color: var(--muted); margin-top: .8mm; }
+  .field b { color: var(--ink); font-family: Consolas, "SF Mono", Menlo, monospace; font-size: 2.7mm; }
+  .barcode { grid-column: 1 / -1; margin: 0 3.5mm 1.8mm; background: repeating-linear-gradient(90deg, #111 0 .35mm, #fff .35mm .7mm, #111 .7mm 1.3mm, #fff 1.3mm 1.6mm, #111 1.6mm 1.8mm, #fff 1.8mm 2.4mm); }
+  .controls { display: flex; gap: 10px; font-size: 14px; color: var(--muted); align-items: center; }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #b9b4aa; background: #fff; cursor: pointer; }
+  @media print {
+    body { background: #fff; min-height: 0; display: block; padding: 0; }
+    .controls { display: none; }
+    .card { transform: none; margin: 10mm; box-shadow: none; border: .2mm solid #999; }
+    @page { margin: 0; }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="band"><div class="brand"><i></i>APEXCORP</div><div class="level">ACCESS LEVEL 5</div></div>
+    <label class="photo" id="photo" title="Click to choose a photo">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="24" r="12" fill="#8a93a3"/><path d="M8 62c2-14 12-22 24-22s22 8 24 22" fill="#8a93a3"/></svg>
+      <input type="file" accept="image/*" id="file" hidden>
+    </label>
+    <div class="info">
+      <div class="name">David K. Miller</div>
+      <div class="role">VP, Systems Engineering</div>
+      <div class="field">Employee ID <b>EMP-90214</b></div>
+      <div class="field">Valid through <b>12/2027</b></div>
+    </div>
+    <div class="barcode"></div>
+  </div>
+  <div class="controls">
+    <span>Click the photo area to choose a picture.</span>
+    <button onclick="window.print()">Print at actual size</button>
+  </div>
+<script>
+  // Scale the on-screen card to fit (printing always uses actual size).
+  const fit = () => document.querySelector(".card").style.setProperty("--zoom", Math.min(2.2, (innerWidth - 32) / (85.6 * 96 / 25.4)).toFixed(3));
+  fit(); addEventListener("resize", fit);
+  document.getElementById("file").addEventListener("change", (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const photo = document.getElementById("photo");
+    photo.style.backgroundImage = `url(${URL.createObjectURL(f)})`;  // local only, never uploaded
+    photo.classList.add("has-image");
+  });
+</script>
+</body>
+</html>

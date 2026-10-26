@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<title>Lock screen</title>
+<!--
+  Phone prop for the Veil desk shot: a lock screen with two notifications that slide in.
+  Open on the phone, add to home screen or go full screen, and tap once: that starts the
+  notification animation (after 2 s) and asks the phone not to sleep while it's open.
+  Everything shown is fictional; "Relay" is a made-up chat app.
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(120% 80% at 30% 0%, #2b3550 0%, #121625 55%, #0b0d12 100%);
+    color: #fff; font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; align-items: center; padding: 9vh 4.5vw 6vh;
+    overflow: hidden; user-select: none; -webkit-user-select: none;
+  }
+  .lock { font-size: 4.2vw; opacity: 0.85; margin-bottom: 1.5vh; }
+  .date { font-size: 5vw; font-weight: 600; opacity: 0.9; }
+  .clock { font-size: 24vw; font-weight: 700; letter-spacing: -0.6vw; line-height: 1; margin: 0.5vh 0 5vh; font-variant-numeric: tabular-nums; }
+  .stack { width: 100%; display: flex; flex-direction: column; gap: 2.2vh; }
+  .note {
+    background: rgba(245, 246, 250, 0.94); color: #111; border-radius: 6vw; padding: 4.2vw 4.6vw;
+    box-shadow: 0 1.2vh 3vh rgba(0,0,0,0.35);
+    transform: translateY(-4vh) scale(0.96); opacity: 0; transition: transform .45s cubic-bezier(.2,.9,.3,1.2), opacity .35s;
+  }
+  .note.show { transform: none; opacity: 1; }
+  .head { display: flex; align-items: center; gap: 2.6vw; font-size: 3.6vw; color: #444; font-weight: 600; margin-bottom: 1.4vw; }
+  .icon { width: 7vw; height: 7vw; border-radius: 1.8vw; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 4vw; }
+  .relay { background: linear-gradient(135deg, #7c3aed, #db2777); }
+  .bank { background: #0f766e; }
+  .head .when { margin-left: auto; font-weight: 500; }
+  .title { font-size: 4.9vw; font-weight: 750; margin-bottom: 0.8vw; }
+  .body { font-size: 4.6vw; line-height: 1.32; }
+  .urgent { color: #b42318; font-weight: 800; }
+  .hint { position: fixed; bottom: 3vh; font-size: 3.4vw; opacity: 0.55; }
+</style>
+</head>
+<body>
+  <div class="lock">🔒</div>
+  <div class="date" id="date"></div>
+  <div class="clock" id="clock"></div>
+  <div class="stack">
+    <div class="note" id="n1">
+      <div class="head"><div class="icon relay">R</div>Relay · #exec-payroll<span class="when">now</span></div>
+      <div class="title">Sarah Jenkins</div>
+      <div class="body"><span class="urgent">URGENT:</span> Elena Rostova's offer is $214,000. Call her at (415) 555-0142 before 5 PM. Don't forward.</div>
+    </div>
+    <div class="note" id="n2">
+      <div class="head"><div class="icon bank">B</div>Northwind Bank<span class="when">now</span></div>
+      <div class="title">Sign-in code</div>
+      <div class="body">Your verification code is 482 913. Never share this code.</div>
+    </div>
+  </div>
+  <div class="hint" id="hint">Tap anywhere to start</div>
+<script>
+  const pad = (n) => String(n).padStart(2, "0");
+  function tick() {
+    const d = new Date();
+    document.getElementById("clock").textContent = `${d.getHours() % 12 || 12}:${pad(d.getMinutes())}`;
+    document.getElementById("date").textContent = d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+  }
+  tick(); setInterval(tick, 1000);
+
+  let started = false;
+  document.body.addEventListener("click", async () => {
+    if (started) return;
+    started = true;
+    document.getElementById("hint").remove();
+    try { await document.documentElement.requestFullscreen?.(); } catch (e) {}
+    try { await navigator.wakeLock?.request("screen"); } catch (e) {}  // keep the screen on while filming
+    setTimeout(() => document.getElementById("n1").classList.add("show"), 2000);
+    setTimeout(() => document.getElementById("n2").classList.add("show"), 5500);
+    try { navigator.vibrate?.([120, 80, 120]); } catch (e) {}
+  });
+</script>
+</body>
+</html>
