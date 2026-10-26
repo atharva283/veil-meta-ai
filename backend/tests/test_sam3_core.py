@@ -98,6 +98,19 @@ def test_local_segmenter_decodes_tracks(monkeypatch):
     assert patch.track_id.startswith("patch-") and 2 in patch.frames
 
 
+def test_init_state_ignores_kwargs_the_model_does_not_take():
+    """sam3's start_session passes offload_state_to_cpu, which the SAM 3.1 model rejects."""
+
+    class Model:
+        def init_state(self, resource_path, offload_video_to_cpu=False, async_loading_frames=False):
+            return {"path": resource_path, "offload": offload_video_to_cpu}
+
+    model = Model()
+    sam3_core._drop_unknown_init_kwargs(model)
+    state = model.init_state(resource_path="a.mp4", offload_video_to_cpu=True, offload_state_to_cpu=False, async_loading_frames=True)
+    assert state == {"path": "a.mp4", "offload": True}
+
+
 def test_set_precision_rewrites_and_restores(tmp_path):
     pkg = tmp_path / "sam3"
     (pkg / "model").mkdir(parents=True)

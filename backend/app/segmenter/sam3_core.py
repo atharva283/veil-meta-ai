@@ -88,8 +88,32 @@ def load_predictor(precision: str = "auto"):
         torch.backends.cuda.matmul.allow_tf32 = True
     # Flash-Attention 3 kernels need Hopper; everything else takes the PyTorch path.
     predictor = build_sam3_predictor(version="sam3.1", use_fa3=False, max_num_objects=MAX_OBJECTS)
-    gpu = torch.cuda.get_device_name() if torch.cuda.is_available() else "CPU"
+    _drop_unknown_init_kwargs(predictor.model)
+    gpu =torch.cuda.get_device_name() if torch.cuda.is_available() else "CPU"
     return predictor, f"SAM 3.1 ({gpu}, {precision})"
+
+
+def _drop_unknown_init_kwargs(model) -> None:
+    """Make `model.init_state` ignore keyword arguments it doesn't take.
+
+    Upstream bug (sam3 @ SAM_COMMIT): `Sam3BasePredictor.start_session` always passes
+    `offload_state_to_cpu`, which the SAM 3.1 multiplex model's `init_state` doesn't
+    accept, so every start_session raises TypeError. add_prompt and propagate_in_video
+    already filter their kwargs by signature upstream; this does the same for init_state.
+    """
+    import functools
+    import inspect
+
+    init = model.init_state
+    params = inspect.signature(init).parameters
+    if any(p.kind is p.VAR_KEYWORD for p in params.values()):
+        return
+
+    @functools.wraps(init)
+    def init_state(*args, **kwargs):
+        return init(*args, **{k: v for k, v in kwargs.items() if k in params})
+
+    model.init_state = init_state
 
 
 # -- inference ---------------------------------------------------------------
