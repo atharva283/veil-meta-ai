@@ -57,7 +57,8 @@ class ModalSamSegmenter:
 
     def _post(self, route: str, video: VideoRecord, payload: dict) -> dict:
         headers = {"Authorization": f"Bearer {settings.modal_auth_token}"} if settings.modal_auth_token else {}
-        with video.path.open("rb") as fh, httpx.Client(timeout=settings.request_timeout_s * 3) as client:
+        # Modal answers requests that run past 150 s with a 303 to poll for the result.
+        with video.path.open("rb") as fh, httpx.Client(timeout=settings.request_timeout_s * 3, follow_redirects=True) as client:
             resp = client.post(
                 f"{settings.modal_endpoint}/{route}",
                 headers=headers,

@@ -4,26 +4,30 @@
 
 Then put the printed https://...modal.run URL in .env as MODAL_ENDPOINT.
 
-Day-1 checklist (lines marked VERIFY were written against the SAM 3 release
-and could not be run before the hackathon):
-  1. Accept the SAM 3.1 license on Hugging Face; create a read token.
+Setup:
+  1. Get access to the gated checkpoints at https://huggingface.co/facebook/sam3.1
+     with the account whose token you use.
   2. modal secret create veil-sam3 HF_TOKEN=hf_xxx VEIL_TOKEN=<any string>
      (VEIL_TOKEN must match MODAL_AUTH_TOKEN in .env).
-  3. Check SAM_PACKAGE and the two model calls in Sam3Service.load / _detect.
-  4. modal deploy, then smoke-test:
+  3. modal deploy, then check $MODAL_ENDPOINT/health ("ok": true once weights load) and:
        curl -H "Authorization: Bearer $TOKEN" \
             -F video=@demo_assets/clips/street_crossing.mp4 \
             -F 'payload={"prompts":[{"id":"p0","text":"face"}]}' \
             $MODAL_ENDPOINT/segment
 
-API contract (mirrors backend/app/segmenter/modal_sam.py):
-  POST /segment  multipart: video=<mp4>, payload={"prompts":[{"id","text"}], "score_threshold", "frame_stride"}
-  POST /refine   multipart: video=<mp4>, payload={"requests":[{"id","text","frame_index","box","window"}]}
-  -> {"tracked": bool, "results": [{"id", "objects": [{"obj_id", "detections": [{"f","score","box","rle"}]}]}]}
+Weights download once into the "veil-sam3-cache" Volume, so later cold starts
+skip the download.
 
-This first version runs the SAM 3.1 *image* model frame by frame and lets the
-client link detections (tracked=false). Next step once it works: switch
-/segment to the video predictor so SAM tracks identities itself (tracked=true).
+API contract (mirrors backend/app/segmenter/modal_sam.py):
+  POST /segment  multipart: video=<mp4>, payload={"prompts":[{"id","text"}], "score_threshold"}
+  POST /refine   multipart: video=<mp4>, payload={"requests":[{"id","text","frame_index","box","point"?,"window"}]}
+  -> {"tracked": true, "results": [{"id", "objects": [{"obj_id", "detections": [{"f","score","box","rle"}]}]}]}
+
+/segment runs SAM 3.1's video predictor: a text prompt detects every instance
+and the tracker follows each one with a stable id through the whole clip
+(objects entering later are picked up as propagation reaches them).
+/refine follows one object from a point prompt (the flagged box's center, or
+an explicit "point" in pixels), `window` frames each way.
 """
 
 from __future__ import annotations
@@ -34,23 +38,31 @@ import tempfile
 
 import modal
 
-SAM_PACKAGE = "git+https://github.com/facebookresearch/sam3.git"  # VERIFY: SAM 3.1 tag/branch
-GPU = "L40S"  # 48 GB; ~half the price of an H100 and plenty for one SAM model
+SAM_COMMIT = "f1647e8d0c1d280991f4d1b7d974c2704537fe66"  # facebookresearch/sam3 main, 2026-10-23
+GPU = "A10G"  # 24 GB Ampere: enough for SAM 3.1; Flash-Attention 3 kernels need Hopper, so they are off below
+MAX_OBJECTS = 64  # per prompt; SAM 3.1's default of 16 is too few for a crowd
+
+cache = modal.Volume.from_name("veil-sam3-cache", create_if_missing=True)
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
     .apt_install("git", "ffmpeg", "libgl1", "libglib2.0-0")
+    .pip_install("torch==2.10.0", "torchvision==0.25.0", index_url="https://download.pytorch.org/whl/cu128")
     .pip_install(
-        "torch==2.7.1",
-        "torchvision==0.22.1",
-        "numpy<2.3",
-        "opencv-python-headless<5",
+        "numpy>=1.26,<2",
+        "opencv-python-headless==4.10.0.84",
         "pillow",
+        # Imported by sam3 but not declared in its dependencies.
+        "einops",
+        "scipy",
+        "psutil",
+        "setuptools<80",  # pkg_resources
         "fastapi[standard]",
         "python-multipart",
         "huggingface_hub",
     )
-    .pip_install(SAM_PACKAGE)
+    .pip_install(f"git+https://github.com/facebookresearch/sam3.git@{SAM_COMMIT}")
+    .env({"HF_HOME": "/cache/hf"})  # huggingface_hub reads HF_TOKEN from the secret
 )
 
 app = modal.App("veil-sam3", image=image)
@@ -68,73 +80,58 @@ def rle_encode(mask):
     return runs if flat[0] == 0 else [0, *runs]
 
 
-def box_iou(a, b) -> float:
-    x0, y0, x1, y1 = max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])
-    inter = max(0.0, x1 - x0) * max(0.0, y1 - y0)
-    union = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
-    return inter / union if union > 0 else 0.0
-
-
 @app.cls(
     gpu=GPU,
     secrets=[modal.Secret.from_name("veil-sam3")],
-    scaledown_window=300,  # stay warm between demo runs; set min_containers=1 on demo day
-    timeout=900,
+    volumes={"/cache": cache},
+    scaledown_window=120,  # scale to zero two minutes after the last request
+    timeout=1200,
 )
 class Sam3Service:
     @modal.enter()
     def load(self):
         import torch
-        from huggingface_hub import login
 
-        if os.environ.get("HF_TOKEN"):
-            login(token=os.environ["HF_TOKEN"])
-        # VERIFY: builder name and checkpoint selection for SAM 3.1.
-        from sam3.model.sam3_image_processor import Sam3Processor
-        from sam3.model_builder import build_sam3_image_model
+        self.predictor, self.load_error = None, ""
+        try:
+            from sam3.model_builder import build_sam3_predictor
 
-        torch.backends.cuda.matmul.allow_tf32 = True
-        self.model = build_sam3_image_model()
-        self.processor = Sam3Processor(self.model)
+            torch.backends.cuda.matmul.allow_tf32 = True
+            self.predictor = build_sam3_predictor(version="sam3.1", use_fa3=False, max_num_objects=MAX_OBJECTS)
+            cache.commit()
+        except Exception as exc:  # usually: this HF account isn't approved for facebook/sam3.1 yet
+            self.load_error = f"{type(exc).__name__}: {exc}"[:600]
 
     # -- model calls ---------------------------------------------------------
 
-    def _detect(self, state, text: str, threshold: float):
-        """Text-prompted detections on an image state: list of (box, mask, score)."""
+    def _request(self, **req):
+        return self.predictor.handle_request(request=req)
+
+    def _stream(self, **req):
+        return self.predictor.handle_stream_request(request=req)
+
+    @staticmethod
+    def _collect(objects: dict, frame_idx: int, outputs: dict, threshold: float, only_obj: int | None = None) -> None:
+        """Fold one frame of predictor output into {obj_id: {frame: detection}}."""
         import numpy as np
 
-        if hasattr(self.processor, "reset_all_prompts"):
-            self.processor.reset_all_prompts(state)
-        # VERIFY: output keys and tensor shapes (masks N×1×H×W, boxes N×4 xyxy px).
-        out = self.processor.set_text_prompt(state=state, prompt=text)
-        masks, boxes, scores = out["masks"], out["boxes"], out["scores"]
-        dets = []
-        for i in range(len(scores)):
-            score = float(scores[i])
-            if score < threshold:
+        ids, probs, masks = outputs["out_obj_ids"], outputs["out_probs"], outputs["out_binary_masks"]
+        for k in range(len(ids)):
+            oid, score = int(ids[k]), float(probs[k])
+            if (only_obj is not None and oid != only_obj) or score < threshold:
                 continue
-            full = masks[i].squeeze().float().cpu().numpy() > 0.5
-            ys, xs = np.nonzero(full)
+            ys, xs = np.nonzero(masks[k])
             if len(xs) == 0:
                 continue
             x0, y0, x1, y1 = int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
-            dets.append(((x0, y0, x1, y1), full[y0:y1, x0:x1], score))
-        return dets
+            objects.setdefault(oid, {})[int(frame_idx)] = {
+                "f": int(frame_idx), "score": round(score, 4), "box": [x0, y0, x1, y1],
+                "rle": rle_encode(masks[k][y0:y1, x0:x1]),
+            }  # fmt: skip
 
-    def _frames(self, path: str, indices=None, stride: int = 1):
-        import cv2
-        from PIL import Image
-
-        cap = cv2.VideoCapture(path)
-        i = 0
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                break
-            if (indices is None and i % stride == 0) or (indices is not None and i in indices):
-                yield i, Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-            i += 1
-        cap.release()
+    @staticmethod
+    def _objects(found: dict) -> list[dict]:
+        return [{"obj_id": oid, "detections": [d for _, d in sorted(frames.items())]} for oid, frames in sorted(found.items())]
 
     # -- HTTP ----------------------------------------------------------------
 
@@ -148,6 +145,8 @@ class Sam3Service:
         def check(auth: str | None):
             if token and auth != f"Bearer {token}":
                 raise HTTPException(401, "missing or wrong bearer token")
+            if self.predictor is None:
+                raise HTTPException(503, f"SAM 3.1 isn't loaded: {self.load_error}")
 
         async def save(video: UploadFile) -> str:
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
@@ -155,69 +154,65 @@ class Sam3Service:
             tmp.close()
             return tmp.name
 
+        def frame_size(path: str) -> tuple[int, int]:
+            import cv2
+
+            cap = cv2.VideoCapture(path)
+            size = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            cap.release()
+            return size
+
         @api.get("/health")
         def health():
-            return {"ok": True, "gpu": GPU}
+            return {"ok": self.predictor is not None, "model": "sam3.1", "commit": SAM_COMMIT, "gpu": GPU, "error": self.load_error}
 
         @api.post("/segment")
         async def segment(video: UploadFile = File(...), payload: str = Form(...), authorization: str | None = Header(None)):
             check(authorization)
             body = json.loads(payload)
-            prompts = body["prompts"]
             threshold = float(body.get("score_threshold", 0.45))
-            stride = int(body.get("frame_stride", 2))  # the client bridges skipped frames
             path = await save(video)
-            results = {p["id"]: [] for p in prompts}
+            session = self._request(type="start_session", resource_path=path)["session_id"]
+            results = []
             try:
-                for f, img in self._frames(path, stride=stride):
-                    state = self.processor.set_image(img)  # one backbone pass per frame
-                    for p in prompts:
-                        for box, crop, score in self._detect(state, p["text"], threshold):
-                            results[p["id"]].append({"f": f, "score": round(score, 4), "box": list(box), "rle": rle_encode(crop)})
+                for p in body["prompts"]:
+                    found: dict = {}
+                    # A new text prompt resets the session's tracking state.
+                    out = self._request(type="add_prompt", session_id=session, frame_index=0, text=p["text"], output_prob_thresh=threshold)
+                    self._collect(found, out["frame_index"], out["outputs"], threshold)
+                    for r in self._stream(type="propagate_in_video", session_id=session, propagation_direction="forward",
+                                          start_frame_index=0, output_prob_thresh=threshold):  # fmt: skip
+                        self._collect(found, r["frame_index"], r["outputs"], threshold)
+                    results.append({"id": p["id"], "objects": self._objects(found)})
             finally:
+                self._request(type="close_session", session_id=session)
                 os.unlink(path)
-            # Untracked: one object per detection; the client links them by IoU.
-            return {
-                "tracked": False,
-                "results": [
-                    {"id": pid, "objects": [{"obj_id": k, "detections": [d]} for k, d in enumerate(dets)]}
-                    for pid, dets in results.items()
-                ],
-            }
+            return {"tracked": True, "results": results}
 
         @api.post("/refine")
         async def refine(video: UploadFile = File(...), payload: str = Form(...), authorization: str | None = Header(None)):
-            """Re-detect a leaked object at a low threshold and follow it from the seed box."""
+            """Follow one object from a point prompt, `window` frames either side of frame_index."""
             check(authorization)
             reqs = json.loads(payload)["requests"]
             path = await save(video)
-            wanted = {f for r in reqs for f in range(max(0, r["frame_index"] - r["window"]), r["frame_index"] + r["window"] + 1)}
-            found: list[dict[int, list]] = [{} for _ in reqs]
-            try:
-                for f, img in self._frames(path, indices=wanted):
-                    state = self.processor.set_image(img)
-                    for r, dets in zip(reqs, found):
-                        if abs(f - r["frame_index"]) <= r["window"]:
-                            dets[f] = self._detect(state, r["text"], 0.2)
-            finally:
-                os.unlink(path)
+            W, H = frame_size(path)
+            session = self._request(type="start_session", resource_path=path)["session_id"]
             results = []
-            for r, dets in zip(reqs, found):
-                chosen = {}
-                for direction in (1, -1):
-                    prev = tuple(r["box"])
-                    f = r["frame_index"] if direction == 1 else r["frame_index"] - 1
-                    while f in dets:
-                        best = max(dets[f], key=lambda d: box_iou(prev, d[0]), default=None)
-                        if best is None or box_iou(prev, best[0]) < 0.2:
-                            break
-                        chosen[f] = best
-                        prev = best[0]
-                        f += direction
-                detections = [
-                    {"f": f, "score": round(s, 4), "box": list(b), "rle": rle_encode(m)} for f, (b, m, s) in sorted(chosen.items())
-                ]
-                results.append({"id": r["id"], "objects": [{"obj_id": 1, "detections": detections}] if detections else []})
+            try:
+                for r in reqs:
+                    x, y = r.get("point") or ((r["box"][0] + r["box"][2]) / 2, (r["box"][1] + r["box"][3]) / 2)
+                    self._request(type="reset_session", session_id=session)
+                    found: dict = {}
+                    out = self._request(type="add_prompt", session_id=session, frame_index=r["frame_index"], obj_id=1,
+                                        points=[[x / W, y / H]], point_labels=[1], rel_coordinates=True)  # fmt: skip
+                    self._collect(found, out["frame_index"], out["outputs"], 0.0, only_obj=1)
+                    for o in self._stream(type="propagate_in_video", session_id=session, propagation_direction="both",
+                                          start_frame_index=r["frame_index"], max_frame_num_to_track=r["window"]):  # fmt: skip
+                        self._collect(found, o["frame_index"], o["outputs"], 0.0, only_obj=1)
+                    results.append({"id": r["id"], "objects": self._objects(found)})
+            finally:
+                self._request(type="close_session", session_id=session)
+                os.unlink(path)
             return {"tracked": True, "results": results}
 
         return api
