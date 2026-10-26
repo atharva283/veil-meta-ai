@@ -46,9 +46,17 @@ def rle_encode(mask):
 # -- precision ---------------------------------------------------------------
 
 
+# sam3's decoder pins attention to the Flash kernel, which needs sm80+ and fp16/bf16, so a
+# T4 (sm75) or fp32 has no kernel left. List the fallbacks too: PyTorch still picks Flash
+# first wherever it runs, then memory-efficient attention (fine on a T4), then math.
+_FLASH_ONLY = "sdpa_kernel(SDPBackend.FLASH_ATTENTION)"
+_WITH_FALLBACKS = "sdpa_kernel([SDPBackend.FLASH_ATTENTION, SDPBackend.EFFICIENT_ATTENTION, SDPBackend.MATH])"
+
+
 def set_precision(precision: str, package_dir: Path | None = None) -> int:
     """Point the installed sam3 package at `precision`; returns files changed.
 
+    Also lets the Flash-only attention fall back to other kernels (see _FLASH_ONLY).
     Must run before `import sam3` in this process. Keeps a pristine copy of each
     file (`.bf16.orig`) so switching back and forth is safe.
     """
@@ -64,11 +72,11 @@ def set_precision(precision: str, package_dir: Path | None = None) -> int:
         for path in (package_dir / sub).glob("*.py"):
             orig = path.with_suffix(".py.bf16.orig")
             source = orig.read_text(encoding="utf-8") if orig.exists() else path.read_text(encoding="utf-8")
-            if "torch.bfloat16" not in source:
+            if "torch.bfloat16" not in source and _FLASH_ONLY not in source:
                 continue
             if not orig.exists():
                 orig.write_text(source, encoding="utf-8")
-            target = source.replace("torch.bfloat16", PRECISIONS[precision])
+            target = source.replace("torch.bfloat16", PRECISIONS[precision]).replace(_FLASH_ONLY, _WITH_FALLBACKS)
             if path.read_text(encoding="utf-8") != target:
                 path.write_text(target, encoding="utf-8")
                 changed += 1

@@ -144,6 +144,20 @@ def test_set_precision_rewrites_and_restores(tmp_path):
         sam3_core.set_precision("int8", pkg)
 
 
+def test_set_precision_lets_flash_only_attention_fall_back(tmp_path):
+    """sam3's decoder pins SDPA to Flash, which a T4 (sm75) doesn't have."""
+    pkg = tmp_path / "sam3"
+    (pkg / "model").mkdir(parents=True)
+    (pkg / "perflib").mkdir()
+    src = "with sdpa_kernel(SDPBackend.FLASH_ATTENTION):\n    out = F.scaled_dot_product_attention(q, k, v)\n"
+    (pkg / "model" / "decoder.py").write_text(src)
+    assert sam3_core.set_precision("fp16", pkg) == 1
+    patched = (pkg / "model" / "decoder.py").read_text()
+    assert "SDPBackend.EFFICIENT_ATTENTION" in patched and "SDPBackend.MATH" in patched
+    assert sam3_core.set_precision("fp16", pkg) == 0  # idempotent
+    compile(patched, "decoder.py", "exec")
+
+
 def test_rule_based_plan_can_be_cached_but_mock_masks_cannot(tmp_path):
     from app.videos import store
 
