@@ -53,6 +53,7 @@ def health() -> dict:
             "auditor": _mode(settings.auditor_live, settings.auditor_model, "mock Muse Spark"),
         },
         "samples": len(store.samples()),
+        "cache_only": settings.cache_only,
     }
 
 
@@ -63,6 +64,8 @@ def samples() -> list[dict]:
 
 @app.post("/api/videos")
 async def upload_video(file: UploadFile = File(...)) -> dict:
+    if settings.cache_only:
+        raise HTTPException(409, "Uploads are off on this demo. Pick a sample clip to replay a precomputed run.")
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in ALLOWED_SUFFIXES:
         raise HTTPException(415, f"Veil accepts {', '.join(sorted(ALLOWED_SUFFIXES))} files. This one is {suffix or 'unknown'}.")
@@ -114,7 +117,10 @@ def create_job(body: JobCreate) -> dict:
         raise HTTPException(404, "No video with that id. Upload it again or pick a sample.")
     if body.parent_job_id and jobs.get(body.parent_job_id) is None:
         raise HTTPException(404, "The previous run expired. Run the full instruction again.")
-    return jobs.submit(body.video_id, body.instruction, body.parent_job_id).public()
+    job = jobs.submit(body.video_id, body.instruction, body.parent_job_id, replay_only=settings.cache_only)
+    if job is None:
+        raise HTTPException(409, "This demo replays precomputed runs. Pick a sample and one of its suggested instructions.")
+    return job.public()
 
 
 @app.get("/api/jobs/{job_id}")
@@ -127,6 +133,7 @@ def get_job(job_id: str) -> dict:
 
 app.mount("/media", StaticFiles(directory=settings.data_dir, check_dir=False), name="media")
 app.mount("/samples", StaticFiles(directory=settings.samples_dir, check_dir=False), name="samples")
+app.mount("/cached", StaticFiles(directory=settings.cache_dir, check_dir=False), name="cached")
 
 # Serve the built frontend when present (npm run build), so one process can host the demo.
 if settings.frontend_dist.exists():

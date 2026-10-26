@@ -26,6 +26,11 @@ export function Pipeline({ job }: { job: Job | null }) {
         <h2 id="pipeline-h">Run</h2>
         <span className="faint small">{job.status === "done" || job.status === "error" ? `Finished in ${seconds(job.elapsed_s)}` : `${seconds(job.elapsed_s)} elapsed`}</span>
       </div>
+      {job.replay && (
+        <p className="faint small">
+          Instant replay of a run recorded {job.replay.frozen_at} with {Object.values(job.replay.models).join(", ")}. No models ran just now.
+        </p>
+      )}
       <ol className="stages">
         {job.stages.map((s) => (
           <li key={s.key} className={`stage-row st-${s.status}`}>

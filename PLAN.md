@@ -58,6 +58,7 @@ Sources: the self-audit review of 2026-10-24, and the Official Rules read on 202
 | # | Task | Needs | Done when |
 |---|---|---|---|
 | T4 | SAM 3.1 on Modal: fix the `VERIFY` lines in `backend/modal_app/sam3_service.py`; cache weights in a Modal Volume; switch `/segment` to the video predictor (`tracked=true`); add point prompts to `/refine`. | GPU | Smoke test from the service docstring returns tracked objects |
+| T4b | Zero-card fallback (added Oct 26, pending your go-ahead): a Colab notebook that runs SAM 3.1 in-process on the sample clips (bf16 → fp16/fp32 on the T4) and freezes the results with `python -m app.cache build`. Batch only; no tunnel. | you (HF access) + Colab | Frozen live-model runs in `demo_assets/cache/` |
 | T11 | Planner on Muse Glimmer-30B: deploy an OpenAI-compatible endpoint on Modal (4-bit build on a 24 GB GPU, scale to zero) and point `PLANNER_MODEL`/`META_MODEL_API_BASE` at it. Fallback: Llama on Groq. | GPU | Top bar shows the planner live; demo instruction yields a valid plan |
 | T12 | Auditor on Glimmer (vision) via `AUDITOR_API_BASE`/`AUDITOR_MODEL`: send 4 frames with a known unblurred face, confirm the box format (assumed 0–1000) and `image_url` input; fix `_audit_batch` if wrong. | GPU | Boxes land on the face |
 | T3b | Self-shot hero clip(s), 20–30 s, consenting friends (see clip audit). Added Oct 26 from the clip audit. | you | Clip in `demo_assets/clips/` with sidecar |
@@ -117,3 +118,4 @@ Checked 2026-10-25. **None of these is CC0**: Pexels uses the [Pexels License](h
 | `manchester_street` | [People Walking on a Busy Street](https://www.pexels.com/video/people-walking-on-a-busy-street-5021555/), zahid Anwar |
 | `desk_inbox` | [Person Writing an Email](https://www.pexels.com/video/person-writing-an-email-6183189/), Taryn Elliott |
 | `storefront_crossing` | [Pedestrians Passing by a Storefront](https://www.pexels.com/video/pedestrians-passing-by-a-storefront-3647789/), George Morina |
+| `kl_traffic` (added Oct 26; 15 s cut from 0:03) | [Cars Stuck in Traffic](https://www.pexels.com/video/cars-stuck-in-traffic-3148319/), Nazim Zafri. Readable plate (BJJ 8840) throughout, riders facing the camera, a woman cycling toward the lens (exception). |

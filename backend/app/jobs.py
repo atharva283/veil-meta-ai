@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 import time
 import traceback
@@ -45,6 +46,10 @@ class Job:
     timeline: dict[str, Any] = field(default_factory=dict)
     modes: dict[str, str] = field(default_factory=dict)
     final_tracks: dict[str, list[Track]] = field(default_factory=dict, repr=False)
+    # Set when this job replays a frozen run (see cache.py) instead of running models.
+    cache_key: str | None = None
+    snapshot: dict | None = field(default=None, repr=False)
+    replay: dict | None = None
 
     def log(self, message: str, level: str = "info", stage: str | None = None) -> None:
         self.events.append({"t": round(time.time() - self.created_at, 2), "level": level, "stage": stage, "message": message})
@@ -59,6 +64,8 @@ class Job:
             st["detail"] = detail
 
     def public(self) -> dict:
+        if self.snapshot is not None:
+            return {**self.snapshot, "id": self.id, "parent_job_id": self.parent_job_id, "replay": self.replay}
         stages = []
         for key, title, blurb in STAGES:
             st = self.stages[key]
@@ -84,6 +91,7 @@ class Job:
             "audit": self.audit,
             "timeline": self.timeline,
             "modes": dict(self.modes),
+            "replay": None,
         }
 
 
@@ -96,11 +104,39 @@ class JobManager:
         self.jobs_dir = settings.data_dir / "jobs"
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
 
-    def submit(self, video_id: str, instruction: str, parent_job_id: str | None) -> Job:
+    def submit(self, video_id: str, instruction: str, parent_job_id: str | None, replay_only: bool = False) -> Job | None:
+        """Replay a frozen run when one matches; otherwise queue a real run (or None if replay_only)."""
+        from .cache import sample_cache
+
+        parent = self.get(parent_job_id) if parent_job_id else None
+        # A live parent has no frozen children, so only top-level and replayed parents can match.
+        hit = sample_cache.lookup(video_id, instruction, parent.cache_key if parent else None) if parent is None or parent.cache_key else None
+        if hit is not None:
+            job = Job(
+                id=uuid.uuid4().hex[:10], video_id=video_id, instruction=instruction.strip(), parent_job_id=parent_job_id,
+                status="done", progress=1.0, finished_at=time.time(), plan=sample_cache.plan(hit),
+                cache_key=hit.key, snapshot=sample_cache.snapshot(hit),
+                replay={"key": hit.key, "frozen_at": hit.frozen_at, "models": hit.models},
+            )  # fmt: skip
+            with self._lock:
+                self._jobs[job.id] = job
+            return job
+        if replay_only:
+            return None
+        job = self._new(video_id, instruction, parent_job_id)
+        self._pool.submit(self._run, job)
+        return job
+
+    def run_now(self, video_id: str, instruction: str, parent_job_id: str | None = None) -> Job:
+        """Run a job in this thread, skipping the replay cache (used to build it)."""
+        job = self._new(video_id, instruction, parent_job_id)
+        self._run(job)
+        return job
+
+    def _new(self, video_id: str, instruction: str, parent_job_id: str | None) -> Job:
         job = Job(id=uuid.uuid4().hex[:10], video_id=video_id, instruction=instruction.strip(), parent_job_id=parent_job_id)
         with self._lock:
             self._jobs[job.id] = job
-        self._pool.submit(self._run, job)
         return job
 
     def _run(self, job: Job) -> None:
@@ -120,6 +156,9 @@ class JobManager:
             traceback.print_exc()
         finally:
             job.finished_at = time.time()
+        if job.status == "done":
+            # What the API returned for this run; cache.py freezes it for replay.
+            (self.jobs_dir / job.id / "job.json").write_text(json.dumps(job.public(), indent=2), encoding="utf-8")
 
     def get(self, job_id: str) -> Job | None:
         return self._jobs.get(job_id)

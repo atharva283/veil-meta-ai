@@ -5,7 +5,7 @@
     "Blur every face.",
     "Blur every face except the woman with the yellow shopping bag."
   ],
-  "order": 3,
+  "order": 4,
   "follow_up_prompts": [
     "Also pixelate the shopping bags."
   ]

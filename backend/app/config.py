@@ -69,6 +69,9 @@ class Settings:
 
     data_dir: Path = field(default_factory=lambda: Path(_env("VEIL_DATA_DIR") or BACKEND_DIR / "data"))
     samples_dir: Path = REPO_DIR / "demo_assets" / "clips"
+    cache_dir: Path = field(default_factory=lambda: Path(_env("VEIL_CACHE_DIR") or REPO_DIR / "demo_assets" / "cache"))
+    # Serve frozen runs only: no uploads, no model calls (a public demo can't spend GPU time).
+    cache_only: bool = field(default_factory=lambda: _env("VEIL_CACHE_ONLY").lower() in ("1", "true", "yes"))
     frontend_dist: Path = REPO_DIR / "frontend" / "dist"
 
     @property

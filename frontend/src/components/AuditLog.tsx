@@ -1,4 +1,4 @@
-import { CircleAlert, Download, Eye, ShieldCheck, Wrench } from "lucide-react";
+import { CircleAlert, Download, Eye, FileText, ShieldCheck, Wrench } from "lucide-react";
 import { useMemo, useState } from "react";
 import { conceptClass, EFFECT_LABEL, STATUS_LABEL, timecode } from "../lib/format";
 import type { AuditStatus, Job } from "../lib/types";
@@ -57,6 +57,11 @@ export function AuditLog({ job, time, onSeek }: Props) {
               </button>
             ))}
           </div>
+          {job.outputs.report_url && (
+            <a className="btn btn-quiet" href={job.outputs.report_url} target="_blank" rel="noreferrer">
+              <FileText size={15} aria-hidden /> Report
+            </a>
+          )}
           {job.outputs.audit_url && (
             <a className="btn btn-quiet" href={job.outputs.audit_url} download={`veil-audit-${job.id}.json`}>
               <Download size={15} aria-hidden /> Download JSON

@@ -16,6 +16,7 @@ from .pipeline import video_io
 from .pipeline.effects import CLASS_COLORS, apply_effect, concept_class, concept_color, draw_preview, obscured_mask
 from .pipeline.tracks import FrameMask, Track, box_iou, clip_mask, select, subtract, tracks_overlap, union
 from .planner import make_plan
+from .report import write_report
 from .schemas import AuditEntry, AuditFinding, Plan
 from .segmenter import RefineRequest, get_segmenter, mock_segmenter
 from .videos import VideoRecord, media_url, store
@@ -316,7 +317,7 @@ def _report(job: Job, video: VideoRecord, comp: Composition, patched: dict[str, 
             else:
                 note = f"No leak found in {checks} sampled frame{'s' if checks != 1 else ''}"
                 if rechecked:
-                    note += f" or by the SAM re-check of all {len(span)} frames it appears in"
+                    note += " or by the SAM re-check of " + (f"all {len(span)} frames it appears in" if len(span) != 1 else "the one frame it appears in")
                 add(t, t.concept, layer.effect, "verified", note + ".")
     for t in comp.kept:
         add(t, t.concept, None, "kept_visible", f"Left visible on purpose: {comp.kept_notes.get(t.track_id, 'exception')}.")
@@ -486,5 +487,11 @@ def run_job(job: Job, manager: JobManager) -> None:
     job.outputs["masks_url"] = media_url(job_dir / "masks.mp4")
     (job_dir / "audit.json").write_text(json.dumps({"instruction": job.instruction, "plan": plan.model_dump(), "modes": job.modes, **job.audit}, indent=2), encoding="utf-8")
     job.outputs["audit_url"] = media_url(job_dir / "audit.json")
+
+    by_id = {t.track_id: t for l in comp.layers for t in l.tracks}
+    fixes = [(by_id[tid], round(p["at"] * video.meta.fps)) for tid, p in patched.items() if tid in by_id]
+    report = write_report(job, video, fixes, job_dir)
+    job.outputs["report_url"] = media_url(job_dir / "report.html")
+    job.log(f"Redaction report written (digest {report['digest'][:12]}…).", stage="done")
     job.progress = 1.0
-    job.log("Done. Redacted video and audit log are ready.", stage="done")
+    job.log("Done. Redacted video, audit log and report are ready.", stage="done")

@@ -88,7 +88,7 @@ export type Job = {
   plan: Plan | null;
   stages: Stage[];
   events: JobEvent[];
-  outputs: { original_url?: string; redacted_url?: string; masks_url?: string; audit_url?: string };
+  outputs: { original_url?: string; redacted_url?: string; masks_url?: string; audit_url?: string; report_url?: string };
   audit: {
     entries?: AuditEntry[];
     counts?: Record<AuditStatus, number>;
@@ -99,4 +99,5 @@ export type Job = {
   };
   timeline: { duration_s?: number; fps?: number; tracks?: TimelineTrack[] };
   modes: { planner?: string; segmenter?: string; auditor?: string };
+  replay: { key: string; frozen_at: string; models: Record<string, string> } | null;
 };

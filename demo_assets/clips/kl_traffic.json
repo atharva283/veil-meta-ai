@@ -1,0 +1,12 @@
+{
+  "title": "Kuala Lumpur traffic",
+  "description": "Real footage (Pexels, Nazim Zafri): rush-hour traffic with readable license plates, riders facing the camera, and a woman cycling toward the lens.",
+  "suggested_prompts": [
+    "Blur every license plate and every face except the woman on the bicycle.",
+    "Pixelate all license plates."
+  ],
+  "order": 2,
+  "follow_up_prompts": [
+    "Also blur the bus advertisement."
+  ]
+}
