@@ -124,13 +124,24 @@ def _extract_args(data: dict) -> dict:
         fn = call.get("function") or {}
         if fn.get("name") == "submit_plan":
             args = fn.get("arguments")
-            return json.loads(args) if isinstance(args, str) else args
+            return _decode_nested(json.loads(args) if isinstance(args, str) else args)
     # Some providers ignore tool_choice and answer in plain JSON.
     content = message.get("content") or ""
     match = re.search(r"\{.*\}", content, re.S)
     if not match:
         raise PlannerError("Llama returned neither a submit_plan tool call nor JSON.")
-    return json.loads(match.group(0))
+    return _decode_nested(json.loads(match.group(0)))
+
+
+def _decode_nested(args: dict) -> dict:
+    """Llama 3.1 8B via Ollama sometimes sends the steps array as a JSON-encoded string."""
+    for key in ("steps", "warnings"):
+        if isinstance(args.get(key), str):
+            try:
+                args[key] = json.loads(args[key])
+            except ValueError:
+                pass  # left as is; validation reports it and Llama gets a retry
+    return args
 
 
 def plan(instruction: str, base: Plan | None = None) -> Plan:

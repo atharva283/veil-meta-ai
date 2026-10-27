@@ -64,3 +64,31 @@ def test_offline_recheck_skips_uploads_instead_of_claiming_coverage():
     result = _recheck(job, mock_segmenter, upload, Composition(), Path("missing.mp4"), ["face"])
     assert result.findings == [] and result.frames_checked == 0
     assert any("re-check skipped" in e["message"] for e in job.events)
+
+
+def test_live_resegmentation_failure_is_flagged_not_patched_by_the_mock(monkeypatch, capsys):
+    """A failed SAM refine used to fall back to the offline segmenter under SAM's name (Colab, Oct 26)."""
+    from app import orchestrator
+    from app.segmenter import mock_segmenter
+
+    class LiveSam:
+        name = "SAM 3.1 (test double)"
+
+        def segment(self, *args, **kwargs):
+            return mock_segmenter.segment(*args, **kwargs)
+
+        def refine(self, video, requests):
+            raise KeyError(58)
+
+    monkeypatch.setattr(orchestrator, "get_segmenter", LiveSam)
+    store.load_samples()
+    street = store.get("sample-street_crossing")
+    job = Job(id="t-refine-fails", video_id=street.id, instruction="Blur every face and license plate.")
+    jobs._jobs[job.id] = job
+    run_job(job, jobs)
+    assert job.error is None and job.audit
+    statuses = [e["status"] for e in job.audit["entries"]]
+    assert "patched" not in statuses and "flagged" in statuses
+    warning = next(e["message"] for e in job.events if "re-segmentation failed" in e["message"])
+    assert "KeyError: 58 at test_recheck.py:" in warning
+    assert "Traceback" in capsys.readouterr().err

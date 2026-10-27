@@ -40,6 +40,20 @@ def test_llama_tool_call_is_parsed(monkeypatch):
     assert plan.source == llama.settings.planner_model
 
 
+def test_llama_steps_sent_as_a_json_string_are_decoded(monkeypatch):
+    """Llama 3.1 8B via Ollama encoded the steps array as a string (Colab, Oct 26)."""
+
+    def handler(request: httpx.Request):
+        args = {**EXAMPLE_PLAN, "steps": json.dumps(EXAMPLE_PLAN["steps"])}
+        call = {"function": {"name": "submit_plan", "arguments": json.dumps(args)}}
+        return _chat({"role": "assistant", "content": None, "tool_calls": [call]})
+
+    _patch_http(monkeypatch, llama, handler)
+    plan = llama.plan("Blur faces")
+    assert len(plan.steps) == len(EXAMPLE_PLAN["steps"])
+    assert plan.source == llama.settings.planner_model
+
+
 def test_llama_plain_json_reply_and_self_repair(monkeypatch):
     replies = iter([
         _chat({"content": 'Here: {"summary": "x", "steps": [{"id": "s1", "op": "effect", "source": "s9", "effect": "blur"}]}'}),

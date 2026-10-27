@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import traceback
 from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
@@ -258,6 +259,7 @@ def _recheck(job: Job, seg, video: VideoRecord, comp: Composition, output: Path,
     try:
         return recheck(seg, video, output, targets, obscured_at, kept_at)
     except Exception as exc:
+        traceback.print_exc()
         job.log(f"SAM re-check failed ({exc}); using the offline segmenter.", level="warn", stage="audit")
         return offline()
 
@@ -438,8 +440,18 @@ def run_job(job: Job, manager: JobManager) -> None:
         try:
             tracks = seg.refine(video, [RefineRequest(f.concept, f.frame_index, f.box) for f in findings])
         except Exception as exc:
-            job.log(f"Re-segmentation failed ({exc}); using the offline segmenter.", level="warn", stage="patch")
-            tracks = mock_segmenter.refine(video, [RefineRequest(f.concept, f.frame_index, f.box) for f in findings])
+            if seg is mock_segmenter:
+                raise
+            # Leave these for a person rather than patch them with the offline segmenter
+            # under SAM's name; the full traceback goes to the server log.
+            traceback.print_exc()
+            where = traceback.extract_tb(exc.__traceback__)[-1]
+            job.log(
+                f"SAM re-segmentation failed ({type(exc).__name__}: {exc} at {Path(where.filename).name}:{where.lineno}); "
+                f"{len(findings)} leak(s) left for manual review.",
+                level="warn", stage="patch",
+            )  # fmt: skip
+            tracks = [None] * len(findings)
         unresolved = []
         changed = False
         for finding, track in zip(findings, tracks):
