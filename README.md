@@ -1,13 +1,41 @@
+<div align="center">
+
 # Veil
 
 **Redact video from a plain-English instruction, then check the result.**
 
-> "Blur every face except the woman in the pink coat."
+[![Built with Llama 3.1](https://img.shields.io/badge/Built_with-Llama_3.1_8B-0866FF?logo=meta&logoColor=white)](https://www.llama.com/)
+[![Meta SAM 3.1](https://img.shields.io/badge/Meta-SAM_3.1-7B3FE4?logo=meta&logoColor=white)](https://github.com/facebookresearch/sam3)
+[![Live on Modal](https://img.shields.io/badge/Live_on-Modal-22C55E)](https://atharva283--veil-demo-web.us-east.modal.run)
+[![License: MIT](https://img.shields.io/badge/License-MIT-F5B700)](LICENSE)
 
-**Live demo:** https://atharva283--veil-demo-web.us-east.modal.run (replays of recorded runs, see below)
-**Demo video:** https://www.youtube.com/watch?v=o4t9FGPvPfQ (3 minutes)
+<img src="docs/media/veil-hero.gif" width="100%" alt="Side by side: the original Manchester street clip and Veil's output, with every face blurred except the woman in the pink coat and the bank logo blacked out">
 
-Built for the Meta Global AI Developer Hackathon, Indie Developer track. Built with Llama.
+<sub><i>"Blur every face except the woman in the pink coat."</i> then <i>"Also hide the bank logo."</i> Recorded on a free Colab T4. The caption is SAM 3.1's audit catching a logo the first pass missed.</sub>
+
+[![Try the live demo](https://img.shields.io/badge/%E2%96%B6_Try_the_live_demo-1C2B33?style=for-the-badge)](https://atharva283--veil-demo-web.us-east.modal.run)
+&nbsp;
+[![Watch the 3-minute video](https://img.shields.io/badge/Watch_the_3--minute_video-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=o4t9FGPvPfQ)
+
+<sub>Live demo: https://atharva283--veil-demo-web.us-east.modal.run · Video: https://www.youtube.com/watch?v=o4t9FGPvPfQ</sub>
+
+<br>
+
+<table>
+  <tr>
+    <td align="center" width="20%"><h3>397 / 397</h3>output frames re-checked by SAM 3.1</td>
+    <td align="center" width="20%"><h3>19</h3>first-pass misses caught and patched by the audit</td>
+    <td align="center" width="20%"><h3>12</h3>frames flagged with timestamps for a person</td>
+    <td align="center" width="20%"><h3>8.7 GiB</h3>SAM 3.1 peak memory on a free Colab T4</td>
+    <td align="center" width="20%"><h3>$0 GPU</h3>to replay: the demo runs on one CPU container</td>
+  </tr>
+</table>
+
+<sub>Manchester street clip, follow-up run. Full numbers in <a href="#results">Results</a>.</sub>
+
+Built for the Meta Global AI Developer Hackathon, Indie Developer track. **Built with Llama.**
+
+</div>
 
 ---
 
@@ -33,19 +61,9 @@ Open the [live demo](https://atharva283--veil-demo-web.us-east.modal.run), pick 
 
 ## How it works
 
-```mermaid
-flowchart LR
-    I["Instruction"] --> P["Llama 3.1 planner<br/>submit_plan tool call"]
-    P --> PL["Plan<br/>segment · select · subtract · union · effect"]
-    V["Video"] --> S["SAM 3.1<br/>text prompt → tracked instances"]
-    PL --> S
-    S --> C["Compose<br/>per-frame mask algebra"]
-    C --> R["Render<br/>blur · pixelate · black out"]
-    R --> A["Audit<br/>SAM 3.1 re-segments every output frame"]
-    A -- "leak found" --> F["Patch<br/>SAM 3.1 point prompt at the leak, tracked ±2 s"]
-    F --> R
-    A -- "clean, or 2 rounds done" --> O["redacted.mp4 · masks.mp4<br/>audit log · Redaction Report"]
-```
+<p align="center">
+  <img src="docs/media/architecture.png" width="100%" alt="Veil pipeline. Llama 3.1 8B turns the instruction into a plan. SAM 3.1 tracks each concept, per-frame mask algebra composes the plan, and the video is rendered. SAM 3.1 then re-segments every output frame; each leak is patched with a SAM 3.1 point prompt tracked two seconds either way and re-rendered. When the output is clean, or after two audit rounds, Veil writes the redacted video, the masks, the audit log and the hash-chained Redaction Report.">
+</p>
 
 | Plan step | Meaning |
 |---|---|
