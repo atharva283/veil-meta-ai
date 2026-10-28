@@ -82,7 +82,7 @@ Measured on the recorded runs in [`demo_assets/cache/`](demo_assets/cache/). Eac
 | Clip and instruction | Planner | Frames re-checked by SAM | Misses caught and re-segmented | Flagged for a person |
 |---|---|---|---|---|
 | Manchester street: "Blur every face except the woman in the pink coat." | Llama 3.1 8B | 397 / 397 | 4 ¹ | 14 ¹ |
-| … follow-up: "Also hide the bank logo." | Llama 3.1 8B | 397 / 397 | 16 | 12 |
+| … follow-up: "Also hide the bank logo." | Llama 3.1 8B | 397 / 397 | 19 (16 new in this pass) | 12 |
 | Desk: "Black out the laptop screen." | Llama 3.1 8B | 199 / 199 | 0 | 1 |
 | … follow-up: "Also black out the phone." | Llama 3.1 8B | 199 / 199 | 0 | 1 |
 
