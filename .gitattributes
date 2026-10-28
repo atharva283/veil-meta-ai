@@ -1,2 +1,4 @@
 # Shell scripts must keep LF endings or bash fails on the stray \r.
 *.sh text eol=lf
+# Frozen runs are hash-chained (see backend/app/report.py): never rewrite their bytes on checkout.
+demo_assets/cache/** -text
