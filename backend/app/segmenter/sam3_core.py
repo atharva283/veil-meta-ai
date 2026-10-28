@@ -19,6 +19,7 @@ fp32 turns CUDA autocast off entirely (slowest, safest).
 from __future__ import annotations
 
 import importlib.util
+import traceback
 from pathlib import Path
 
 SAM_COMMIT = "f1647e8d0c1d280991f4d1b7d974c2704537fe66"  # facebookresearch/sam3 main, 2026-10-23
@@ -360,6 +361,21 @@ def segment(predictor, video_path: str, prompts: list[dict], threshold: float = 
     return {"tracked": True, "results": [{"id": p["id"], "objects": _objects(found[p["id"]])} for p in prompts]}
 
 
+def _direction(frame: int, num_frames: int) -> str:
+    """Propagation direction for a point prompt on `frame`.
+
+    After a forward pass that starts on the first or last frame, sam3 treats the clip as
+    fully propagated and answers the backward pass from results it never computed
+    (KeyError at sam3_multiplex_tracking.py:2275). From an edge, only one direction has
+    frames anyway.
+    """
+    if frame >= num_frames - 1:
+        return "backward"
+    if frame <= 0:
+        return "forward"
+    return "both"
+
+
 def refine(predictor, video_path: str, requests: list[dict], width: int, height: int) -> dict:
     """Follow one object per request from a point prompt, `window` frames either side.
 
@@ -379,22 +395,28 @@ def refine(predictor, video_path: str, requests: list[dict], width: int, height:
             if n > _piece_frames():
                 start, end = max(0, r["frame_index"] - r["window"]), min(n, r["frame_index"] + r["window"] + 1)
             path = video_path if (start, end) == (0, n) else _write_pieces(video_path, [(start, end)], folder)[0]
-            session = _start(predictor, path)
+            local = r["frame_index"] - start
             found: dict = {}
             try:
-                out = predictor.handle_request(request={
-                    "type": "add_prompt", "session_id": session, "frame_index": r["frame_index"] - start, "obj_id": 1,
-                    "points": [[x / width, y / height]], "point_labels": [1], "rel_coordinates": True,
-                })  # fmt: skip
-                _collect(found, out["frame_index"], out["outputs"], 0.0, only_obj=1, offset=start)
-                for o in predictor.handle_stream_request(request={
-                    "type": "propagate_in_video", "session_id": session, "propagation_direction": "both",
-                    "start_frame_index": r["frame_index"] - start, "max_frame_num_to_track": r["window"],
-                }):  # fmt: skip
-                    _collect(found, o["frame_index"], o["outputs"], 0.0, only_obj=1, offset=start)
-            finally:
-                predictor.handle_request(request={"type": "close_session", "session_id": session})
-                _free_cuda()
+                session = _start(predictor, path)
+                try:
+                    out = predictor.handle_request(request={
+                        "type": "add_prompt", "session_id": session, "frame_index": local, "obj_id": 1,
+                        "points": [[x / width, y / height]], "point_labels": [1], "rel_coordinates": True,
+                    })  # fmt: skip
+                    _collect(found, out["frame_index"], out["outputs"], 0.0, only_obj=1, offset=start)
+                    for o in predictor.handle_stream_request(request={
+                        "type": "propagate_in_video", "session_id": session, "propagation_direction": _direction(local, end - start),
+                        "start_frame_index": local, "max_frame_num_to_track": r["window"],
+                    }):  # fmt: skip
+                        _collect(found, o["frame_index"], o["outputs"], 0.0, only_obj=1, offset=start)
+                finally:
+                    predictor.handle_request(request={"type": "close_session", "session_id": session})
+                    _free_cuda()
+            except Exception:
+                # One bad request mustn't cost the others their patches; the caller flags this one.
+                traceback.print_exc()
+                found = {}
             results.append({"id": r["id"], "objects": _objects(found)})
     finally:
         shutil.rmtree(folder, ignore_errors=True)

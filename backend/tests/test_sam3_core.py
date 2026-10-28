@@ -141,6 +141,40 @@ def test_refine_prompts_the_box_center_as_a_relative_point():
     assert [o["obj_id"] for o in res["objects"]] == [1]  # only the prompted object
 
 
+def test_refine_on_the_last_frame_propagates_backward_only(monkeypatch, tmp_path):
+    """A leak on a clip's last frame crashed sam3's backward pass (KeyError 58, Colab Oct 27)."""
+    monkeypatch.setenv("VEIL_SAM_PIECE", "4")
+    clip = _video(tmp_path / "clip.mp4", 10)
+    pred = FakePredictor()
+    sam3_core.refine(pred, clip, [
+        {"id": "last", "frame_index": 9, "box": [28, 18, 44, 34], "window": 2},
+        {"id": "first", "frame_index": 0, "box": [28, 18, 44, 34], "window": 2},
+        {"id": "mid", "frame_index": 5, "box": [28, 18, 44, 34], "window": 2},
+    ], W, H)
+    directions = [r["propagation_direction"] for r in pred.requests if r["type"] == "propagate_in_video"]
+    assert directions == ["backward", "forward", "both"]
+
+
+def test_one_failing_refine_request_does_not_cancel_the_others(monkeypatch):
+    pred = FakePredictor()
+    real = pred.handle_request
+    calls = {"n": 0}
+
+    def flaky(request):
+        if request["type"] == "add_prompt":
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise KeyError(58)
+        return real(request)
+
+    monkeypatch.setattr(pred, "handle_request", flaky)
+    box = [28, 18, 44, 34]
+    data = sam3_core.refine(pred, "clip.mp4", [{"id": "a", "frame_index": 2, "box": box, "window": 5}, {"id": "b", "frame_index": 2, "box": box, "window": 5}], W, H)
+    by_id = {r["id"]: r["objects"] for r in data["results"]}
+    assert by_id["a"] == [] and by_id["b"]
+    assert pred.closed == 2  # both sessions closed, including the failed one
+
+
 def test_local_segmenter_decodes_tracks(monkeypatch):
     pred = FakePredictor()
     monkeypatch.setattr(sam3_core, "load_predictor", lambda precision: (pred, "SAM 3.1 (Fake GPU, fp16)"))
