@@ -1,0 +1,70 @@
+{
+  "instruction": "Black out the laptop screen.",
+  "plan": {
+    "summary": "Black out the laptop screen",
+    "steps": [
+      {
+        "id": "s1",
+        "op": "segment",
+        "concept": "laptop screen",
+        "source": null,
+        "reference": null,
+        "inputs": [],
+        "effect": null,
+        "note": "laptop screen"
+      },
+      {
+        "id": "s2",
+        "op": "effect",
+        "concept": null,
+        "source": "s1",
+        "reference": null,
+        "inputs": [],
+        "effect": "blackout",
+        "note": "laptop screen"
+      }
+    ],
+    "warnings": [],
+    "source": "llama3.1:8b"
+  },
+  "modes": {
+    "planner": "llama3.1:8b",
+    "segmenter": "SAM 3.1 (Tesla T4, fp16)",
+    "auditor": "none (SAM re-check only)"
+  },
+  "entries": [
+    {
+      "track_id": "laptop_screen-1",
+      "concept": "laptop screen",
+      "effect": "blackout",
+      "status": "verified",
+      "start_s": 0.0,
+      "end_s": 7.96,
+      "frames": 199,
+      "confidence": 0.908,
+      "note": "No leak found in 17 sampled frames or by the SAM re-check of all 199 frames it appears in."
+    },
+    {
+      "track_id": "leak-1",
+      "concept": "laptop screen",
+      "effect": null,
+      "status": "flagged",
+      "start_s": 5.16,
+      "end_s": 5.2,
+      "frames": 1,
+      "confidence": 0.0,
+      "note": "SAM re-check still finds a laptop screen at 5.16s (78% hidden). Couldn't re-segment it; review this moment manually."
+    }
+  ],
+  "counts": {
+    "verified": 1,
+    "patched": 0,
+    "kept_visible": 0,
+    "flagged": 1
+  },
+  "rounds": 1,
+  "audited_frames": 17,
+  "rechecked_frames": 199,
+  "frame_count": 199,
+  "patches": []
+}

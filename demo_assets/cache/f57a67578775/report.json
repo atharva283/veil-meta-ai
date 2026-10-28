@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "generated_at": "2026-10-27T17:49:06Z",
+  "job_id": "20c32973f0",
+  "instruction": "Black out the laptop screen.",
+  "video": {
+    "title": "Desk with an open inbox",
+    "width": 1280,
+    "height": 720,
+    "fps": 25.0,
+    "frame_count": 199,
+    "duration_s": 7.96,
+    "has_audio": false
+  },
+  "models": {
+    "planner": "llama3.1:8b",
+    "segmenter": "SAM 3.1 (Tesla T4, fp16)",
+    "auditor": "none (SAM re-check only)"
+  },
+  "plan": [
+    {
+      "step": "Segment(\"laptop screen\")",
+      "note": "laptop screen"
+    },
+    {
+      "step": "Blackout(s1)",
+      "note": "laptop screen"
+    }
+  ],
+  "coverage": {
+    "sampled_frames": 17,
+    "rechecked_frames": 199,
+    "frame_count": 199,
+    "rounds": 1
+  },
+  "counts": {
+    "verified": 1,
+    "patched": 0,
+    "kept_visible": 0,
+    "flagged": 1
+  },
+  "objects": [
+    {
+      "track_id": "laptop_screen-1",
+      "concept": "laptop screen",
+      "effect": "blackout",
+      "status": "verified",
+      "start_s": 0.0,
+      "end_s": 7.96,
+      "frames": 199,
+      "confidence": 0.908,
+      "note": "No leak found in 17 sampled frames or by the SAM re-check of all 199 frames it appears in."
+    },
+    {
+      "track_id": "leak-1",
+      "concept": "laptop screen",
+      "effect": null,
+      "status": "flagged",
+      "start_s": 5.16,
+      "end_s": 5.2,
+      "frames": 1,
+      "confidence": 0.0,
+      "note": "SAM re-check still finds a laptop screen at 5.16s (78% hidden). Couldn't re-segment it; review this moment manually."
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "input",
+      "sha256": "0b1b5fe21f96af15a86992ea6e3ac4ef89e32c49e5a73e8827ac345b4fe8c1fb",
+      "link": "2d545b83da56ea6ad2b9f2a2d029cfed14dcbcb76ea6bebc9052e7ba7c706357"
+    },
+    {
+      "name": "plan.json",
+      "sha256": "769356dbce71492229415297c8ec3d8639debbf71d351cd109bd062331ddebe7",
+      "link": "169791064fd0e2bc26ebeae6cf9218c784b521a343c09853c39a84322778a1b8"
+    },
+    {
+      "name": "redacted.mp4",
+      "sha256": "c958bcbd5222d55c2df957ca341aa33849889ee726500096886ca44ee9d8ae4b",
+      "link": "b1ee2eb10320f78e304ed8ebe7179656be3e0e7efebdddcbb3ef813f9b16c18e"
+    },
+    {
+      "name": "masks.mp4",
+      "sha256": "cfa75da9d54d7ed15f2890e3783014a436ac6e6728ea2bd8343cc2d76e553605",
+      "link": "13b16100d6d9dc043ccf338d4a5d58aceb07b94ea3b081e9dc4efd4b2d97192b"
+    },
+    {
+      "name": "audit.json",
+      "sha256": "a1e1166ae65ab8aa320196f38177e29dd3c27975096f344a631025bc8711f60e",
+      "link": "22bf0227351c41bf308ae923d3c7f76d5a34c74ebe654b0509c9407b5cbd1209"
+    }
+  ],
+  "digest": "22bf0227351c41bf308ae923d3c7f76d5a34c74ebe654b0509c9407b5cbd1209"
+}

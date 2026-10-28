@@ -1,0 +1,1244 @@
+{
+  "id": "2b0139d63d",
+  "video_id": "sample-manchester_street",
+  "instruction": "Blur every face except the woman in the pink coat.",
+  "parent_job_id": null,
+  "status": "done",
+  "error": null,
+  "progress": 1.0,
+  "elapsed_s": 4488.78,
+  "plan": {
+    "summary": "Blur faces except the woman in the pink coat",
+    "source": "llama3.1:8b",
+    "warnings": [],
+    "steps": [
+      {
+        "id": "s1",
+        "op": "segment",
+        "concept": "face",
+        "source": null,
+        "reference": null,
+        "inputs": [],
+        "effect": null,
+        "note": null,
+        "label": "Segment(\"face\")"
+      },
+      {
+        "id": "s2",
+        "op": "segment",
+        "concept": "person",
+        "source": null,
+        "reference": null,
+        "inputs": [],
+        "effect": null,
+        "note": null,
+        "label": "Segment(\"person\")"
+      },
+      {
+        "id": "s3",
+        "op": "segment",
+        "concept": "pink coat",
+        "source": null,
+        "reference": null,
+        "inputs": [],
+        "effect": null,
+        "note": null,
+        "label": "Segment(\"pink coat\")"
+      },
+      {
+        "id": "s4",
+        "op": "select",
+        "concept": null,
+        "source": "s2",
+        "reference": "s3",
+        "inputs": [],
+        "effect": null,
+        "note": "the woman in the pink coat",
+        "label": "Select(s2 \u2229 s3)"
+      },
+      {
+        "id": "s5",
+        "op": "subtract",
+        "concept": null,
+        "source": "s1",
+        "reference": "s4",
+        "inputs": [],
+        "effect": null,
+        "note": "faces except the woman in the pink coat",
+        "label": "Subtract(s1 \u2212 s4)"
+      },
+      {
+        "id": "s6",
+        "op": "effect",
+        "concept": null,
+        "source": "s5",
+        "reference": null,
+        "inputs": [],
+        "effect": "blur",
+        "note": "faces",
+        "label": "Blur(s5)"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "key": "plan",
+      "title": "Plan",
+      "blurb": "Llama 3.1 turns the instruction into tool calls",
+      "status": "done",
+      "detail": "6 steps",
+      "duration_s": 21.05
+    },
+    {
+      "key": "segment",
+      "title": "Segment",
+      "blurb": "SAM 3.1 finds and tracks each concept",
+      "status": "done",
+      "detail": "75 tracks across 3 concepts",
+      "duration_s": 1154.14
+    },
+    {
+      "key": "compose",
+      "title": "Compose",
+      "blurb": "Mask logic applies selections and exceptions",
+      "status": "done",
+      "detail": "17 to redact, 4 kept",
+      "duration_s": 0.27
+    },
+    {
+      "key": "render",
+      "title": "Render",
+      "blurb": "Effects are applied frame by frame",
+      "status": "done",
+      "detail": "397 frames",
+      "duration_s": 27.6
+    },
+    {
+      "key": "audit",
+      "title": "Audit",
+      "blurb": "Muse Spark checks output frames for leaks",
+      "status": "done",
+      "detail": "13 leak(s) found",
+      "duration_s": 383.31
+    },
+    {
+      "key": "patch",
+      "title": "Patch",
+      "blurb": "Leaks are re-segmented and re-rendered",
+      "status": "done",
+      "detail": "4 patched, 14 flagged",
+      "duration_s": 2895.72
+    }
+  ],
+  "events": [
+    {
+      "t": 21.06,
+      "level": "info",
+      "stage": "plan",
+      "message": "llama3.1:8b produced 6 steps."
+    },
+    {
+      "t": 1175.2,
+      "level": "info",
+      "stage": "segment",
+      "message": "Segment(\"face\") found 19 tracked instances."
+    },
+    {
+      "t": 1175.2,
+      "level": "info",
+      "stage": "segment",
+      "message": "Segment(\"person\") found 52 tracked instances."
+    },
+    {
+      "t": 1175.2,
+      "level": "info",
+      "stage": "segment",
+      "message": "Segment(\"pink coat\") found 4 tracked instances."
+    },
+    {
+      "t": 1175.47,
+      "level": "info",
+      "stage": "compose",
+      "message": "17 instance(s) to redact, 4 kept visible by exception."
+    },
+    {
+      "t": 1586.38,
+      "level": "info",
+      "stage": "audit",
+      "message": "Audit round 1: checked 27 sampled frames and re-segmented all 397, found 13 leaked object(s) across 277 frame reports."
+    },
+    {
+      "t": 2976.15,
+      "level": "info",
+      "stage": "patch",
+      "message": "Patched face at 10.74s (new track)."
+    },
+    {
+      "t": 2976.15,
+      "level": "info",
+      "stage": "patch",
+      "message": "Patched face at 5.91s (new track)."
+    },
+    {
+      "t": 2976.15,
+      "level": "info",
+      "stage": "patch",
+      "message": "Patched face at 8.07s (new track)."
+    },
+    {
+      "t": 2976.15,
+      "level": "info",
+      "stage": "patch",
+      "message": "Patched face at 8.51s (new track)."
+    },
+    {
+      "t": 3387.29,
+      "level": "info",
+      "stage": "audit",
+      "message": "Audit round 2: checked 27 sampled frames and re-segmented all 397, found 14 leaked object(s) across 267 frame reports."
+    },
+    {
+      "t": 4482.11,
+      "level": "warn",
+      "stage": "patch",
+      "message": "SAM re-segmentation failed (KeyError: 58 at sam3_multiplex_tracking.py:2275); 14 leak(s) left for manual review."
+    },
+    {
+      "t": 4482.11,
+      "level": "warn",
+      "stage": "audit",
+      "message": "14 possible leak(s) need manual review."
+    },
+    {
+      "t": 4488.78,
+      "level": "info",
+      "stage": "done",
+      "message": "Redaction report written (digest 470dcadbd234\u2026)."
+    },
+    {
+      "t": 4488.78,
+      "level": "info",
+      "stage": "done",
+      "message": "Done. Redacted video, audit log and report are ready."
+    }
+  ],
+  "outputs": {
+    "original_url": "/samples/manchester_street.mp4",
+    "redacted_url": "/cached/f1033d7cf4b3/redacted.mp4",
+    "masks_url": "/cached/f1033d7cf4b3/masks.mp4",
+    "audit_url": "/cached/f1033d7cf4b3/audit.json",
+    "report_url": "/cached/f1033d7cf4b3/report.html"
+  },
+  "audit": {
+    "entries": [
+      {
+        "track_id": "face-1",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 0.0,
+        "end_s": 2.436,
+        "frames": 73,
+        "confidence": 0.781,
+        "note": "No leak found in 5 sampled frames or by the SAM re-check of all 73 frames it appears in."
+      },
+      {
+        "track_id": "face-2",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 0.601,
+        "end_s": 5.005,
+        "frames": 132,
+        "confidence": 0.712,
+        "note": "No leak found in 8 sampled frames or by the SAM re-check of all 132 frames it appears in."
+      },
+      {
+        "track_id": "face-3",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 1.335,
+        "end_s": 9.977,
+        "frames": 251,
+        "confidence": 0.689,
+        "note": "No leak found in 17 sampled frames or by the SAM re-check of all 259 frames it appears in."
+      },
+      {
+        "track_id": "leak-1",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 2.369,
+        "end_s": 2.402,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 2.37s (74% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "face-4",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 4.438,
+        "end_s": 5.005,
+        "frames": 17,
+        "confidence": 0.674,
+        "note": "No leak found in 1 sampled frame or by the SAM re-check of all 17 frames it appears in."
+      },
+      {
+        "track_id": "face-5",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 4.471,
+        "end_s": 8.275,
+        "frames": 114,
+        "confidence": 0.672,
+        "note": "No leak found in 8 sampled frames or by the SAM re-check of all 114 frames it appears in."
+      },
+      {
+        "track_id": "leak-3",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 4.538,
+        "end_s": 4.571,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 4.54s (76% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "face-4-visible",
+        "concept": "face",
+        "effect": null,
+        "status": "kept_visible",
+        "start_s": 5.005,
+        "end_s": 8.542,
+        "frames": 90,
+        "confidence": 0.686,
+        "note": "Left visible on purpose: the woman in the pink coat."
+      },
+      {
+        "track_id": "face-6",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 5.005,
+        "end_s": 6.874,
+        "frames": 53,
+        "confidence": 0.673,
+        "note": "No leak found in 4 sampled frames or by the SAM re-check of all 56 frames it appears in."
+      },
+      {
+        "track_id": "leak-4",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 5.906,
+        "end_s": 5.939,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 5.91s (78% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "patch-face-1-177",
+        "concept": "face",
+        "effect": "blur",
+        "status": "patched",
+        "start_s": 5.906,
+        "end_s": 5.939,
+        "frames": 1,
+        "confidence": 1.0,
+        "note": "Missed by the first segmentation pass. Audit caught it at 5.91s and SAM re-segmented it."
+      },
+      {
+        "track_id": "face-6-visible",
+        "concept": "face",
+        "effect": null,
+        "status": "kept_visible",
+        "start_s": 6.139,
+        "end_s": 6.24,
+        "frames": 3,
+        "confidence": 0.673,
+        "note": "Left visible on purpose: the woman in the pink coat."
+      },
+      {
+        "track_id": "face-7",
+        "concept": "face",
+        "effect": null,
+        "status": "kept_visible",
+        "start_s": 6.406,
+        "end_s": 8.475,
+        "frames": 62,
+        "confidence": 0.843,
+        "note": "Left visible on purpose: the woman in the pink coat."
+      },
+      {
+        "track_id": "leak-5",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 6.406,
+        "end_s": 6.44,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 6.41s (62% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "face-8",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 7.14,
+        "end_s": 8.408,
+        "frames": 38,
+        "confidence": 0.671,
+        "note": "No leak found in 2 sampled frames or by the SAM re-check of all 38 frames it appears in."
+      },
+      {
+        "track_id": "face-9",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 7.608,
+        "end_s": 9.142,
+        "frames": 46,
+        "confidence": 0.658,
+        "note": "No leak found in 3 sampled frames or by the SAM re-check of all 46 frames it appears in."
+      },
+      {
+        "track_id": "patch-face-1-242",
+        "concept": "face",
+        "effect": "blur",
+        "status": "patched",
+        "start_s": 8.075,
+        "end_s": 8.108,
+        "frames": 1,
+        "confidence": 1.0,
+        "note": "Missed by the first segmentation pass. Audit caught it at 8.07s and SAM re-segmented it."
+      },
+      {
+        "track_id": "leak-6",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 8.308,
+        "end_s": 8.342,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 8.31s (77% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "patch-face-1-255",
+        "concept": "face",
+        "effect": "blur",
+        "status": "patched",
+        "start_s": 8.509,
+        "end_s": 8.542,
+        "frames": 1,
+        "confidence": 1.0,
+        "note": "Missed by the first segmentation pass. Audit caught it at 8.51s and SAM re-segmented it."
+      },
+      {
+        "track_id": "face-10",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 8.675,
+        "end_s": 13.247,
+        "frames": 137,
+        "confidence": 0.771,
+        "note": "No leak found in 9 sampled frames or by the SAM re-check of all 137 frames it appears in."
+      },
+      {
+        "track_id": "leak-8",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 8.809,
+        "end_s": 8.842,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 8.81s (1% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "face-11",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 9.042,
+        "end_s": 13.247,
+        "frames": 126,
+        "confidence": 0.79,
+        "note": "No leak found in 8 sampled frames or by the SAM re-check of all 126 frames it appears in."
+      },
+      {
+        "track_id": "face-12",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 9.443,
+        "end_s": 10.377,
+        "frames": 28,
+        "confidence": 0.707,
+        "note": "No leak found in 2 sampled frames or by the SAM re-check of all 28 frames it appears in."
+      },
+      {
+        "track_id": "face-13",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 9.943,
+        "end_s": 13.247,
+        "frames": 84,
+        "confidence": 0.652,
+        "note": "No leak found in 7 sampled frames or by the SAM re-check of all 99 frames it appears in."
+      },
+      {
+        "track_id": "face-14",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 9.943,
+        "end_s": 13.247,
+        "frames": 84,
+        "confidence": 0.652,
+        "note": "No leak found in 7 sampled frames or by the SAM re-check of all 99 frames it appears in."
+      },
+      {
+        "track_id": "leak-9",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 9.943,
+        "end_s": 9.977,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 9.94s (80% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "face-15",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 9.977,
+        "end_s": 12.412,
+        "frames": 73,
+        "confidence": 0.668,
+        "note": "No leak found in 5 sampled frames or by the SAM re-check of all 73 frames it appears in."
+      },
+      {
+        "track_id": "leak-7",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 10.177,
+        "end_s": 10.21,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 10.18s (79% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "leak-10",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 10.31,
+        "end_s": 10.344,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 10.31s (75% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "patch-face-1-322",
+        "concept": "face",
+        "effect": "blur",
+        "status": "patched",
+        "start_s": 10.744,
+        "end_s": 10.777,
+        "frames": 1,
+        "confidence": 1.0,
+        "note": "Missed by the first segmentation pass. Audit caught it at 10.74s and SAM re-segmented it."
+      },
+      {
+        "track_id": "face-16",
+        "concept": "face",
+        "effect": null,
+        "status": "kept_visible",
+        "start_s": 11.078,
+        "end_s": 11.144,
+        "frames": 2,
+        "confidence": 0.688,
+        "note": "Left visible on purpose: the woman in the pink coat."
+      },
+      {
+        "track_id": "face-17",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 11.245,
+        "end_s": 12.613,
+        "frames": 41,
+        "confidence": 0.651,
+        "note": "No leak found in 3 sampled frames or by the SAM re-check of all 41 frames it appears in."
+      },
+      {
+        "track_id": "face-18",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 11.311,
+        "end_s": 12.079,
+        "frames": 23,
+        "confidence": 0.666,
+        "note": "No leak found in 2 sampled frames or by the SAM re-check of all 23 frames it appears in."
+      },
+      {
+        "track_id": "leak-13",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 11.445,
+        "end_s": 11.478,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 11.44s (76% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "leak-14",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 12.546,
+        "end_s": 12.579,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 12.55s (78% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "leak-2",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 12.646,
+        "end_s": 12.679,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 12.65s (0% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "leak-12",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 12.713,
+        "end_s": 12.746,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 12.71s (60% hidden). Couldn't re-segment it; review this moment manually."
+      },
+      {
+        "track_id": "face-19",
+        "concept": "face",
+        "effect": "blur",
+        "status": "verified",
+        "start_s": 13.013,
+        "end_s": 13.247,
+        "frames": 7,
+        "confidence": 0.659,
+        "note": "No leak found in 1 sampled frame or by the SAM re-check of all 7 frames it appears in."
+      },
+      {
+        "track_id": "leak-11",
+        "concept": "face",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 13.213,
+        "end_s": 13.247,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a face at 13.21s (64% hidden). Couldn't re-segment it; review this moment manually."
+      }
+    ],
+    "counts": {
+      "verified": 17,
+      "patched": 4,
+      "kept_visible": 4,
+      "flagged": 14
+    },
+    "rounds": 2,
+    "audited_frames": 27,
+    "rechecked_frames": 397,
+    "frame_count": 397,
+    "patches": [
+      {
+        "track_id": "patch-face-1-322",
+        "kind": "added",
+        "at": 10.74,
+        "concept": "face",
+        "reason": "SAM re-check still finds a face at 10.74s (72% hidden)"
+      },
+      {
+        "track_id": "patch-face-1-177",
+        "kind": "added",
+        "at": 5.91,
+        "concept": "face",
+        "reason": "SAM re-check still finds a face at 5.91s (80% hidden)"
+      },
+      {
+        "track_id": "patch-face-1-242",
+        "kind": "added",
+        "at": 8.07,
+        "concept": "face",
+        "reason": "SAM re-check still finds a face at 8.07s (0% hidden)"
+      },
+      {
+        "track_id": "patch-face-1-255",
+        "kind": "added",
+        "at": 8.51,
+        "concept": "face",
+        "reason": "SAM re-check still finds a face at 8.51s (0% hidden)"
+      }
+    ]
+  },
+  "timeline": {
+    "duration_s": 13.247,
+    "fps": 29.97,
+    "tracks": [
+      {
+        "track_id": "face-1",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            0.0,
+            2.436
+          ]
+        ]
+      },
+      {
+        "track_id": "face-2",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            0.601,
+            5.005
+          ]
+        ]
+      },
+      {
+        "track_id": "face-3",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            1.335,
+            7.841
+          ],
+          [
+            8.108,
+            9.977
+          ]
+        ]
+      },
+      {
+        "track_id": "face-4",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            4.438,
+            5.005
+          ]
+        ]
+      },
+      {
+        "track_id": "face-5",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            4.471,
+            8.275
+          ]
+        ]
+      },
+      {
+        "track_id": "face-6",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            5.005,
+            6.139
+          ],
+          [
+            6.24,
+            6.874
+          ]
+        ]
+      },
+      {
+        "track_id": "face-8",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            7.14,
+            8.408
+          ]
+        ]
+      },
+      {
+        "track_id": "face-9",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            7.608,
+            9.142
+          ]
+        ]
+      },
+      {
+        "track_id": "face-10",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            8.675,
+            13.247
+          ]
+        ]
+      },
+      {
+        "track_id": "face-11",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            9.042,
+            13.247
+          ]
+        ]
+      },
+      {
+        "track_id": "face-12",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            9.443,
+            10.377
+          ]
+        ]
+      },
+      {
+        "track_id": "face-13",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            9.943,
+            10.077
+          ],
+          [
+            10.577,
+            13.247
+          ]
+        ]
+      },
+      {
+        "track_id": "face-14",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            9.943,
+            10.711
+          ],
+          [
+            11.211,
+            13.247
+          ]
+        ]
+      },
+      {
+        "track_id": "face-15",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            9.977,
+            12.412
+          ]
+        ]
+      },
+      {
+        "track_id": "face-17",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            11.245,
+            12.613
+          ]
+        ]
+      },
+      {
+        "track_id": "face-18",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            11.311,
+            12.079
+          ]
+        ]
+      },
+      {
+        "track_id": "face-19",
+        "concept": "face",
+        "class": "face",
+        "status": "verified",
+        "effect": "blur",
+        "spans": [
+          [
+            13.013,
+            13.247
+          ]
+        ]
+      },
+      {
+        "track_id": "patch-face-1-322",
+        "concept": "face",
+        "class": "face",
+        "status": "patched",
+        "effect": "blur",
+        "spans": [
+          [
+            10.744,
+            10.777
+          ]
+        ]
+      },
+      {
+        "track_id": "patch-face-1-177",
+        "concept": "face",
+        "class": "face",
+        "status": "patched",
+        "effect": "blur",
+        "spans": [
+          [
+            5.906,
+            5.939
+          ]
+        ]
+      },
+      {
+        "track_id": "patch-face-1-242",
+        "concept": "face",
+        "class": "face",
+        "status": "patched",
+        "effect": "blur",
+        "spans": [
+          [
+            8.075,
+            8.108
+          ]
+        ]
+      },
+      {
+        "track_id": "patch-face-1-255",
+        "concept": "face",
+        "class": "face",
+        "status": "patched",
+        "effect": "blur",
+        "spans": [
+          [
+            8.509,
+            8.542
+          ]
+        ]
+      },
+      {
+        "track_id": "face-4-visible",
+        "concept": "face",
+        "class": "face",
+        "status": "kept_visible",
+        "effect": null,
+        "spans": [
+          [
+            5.005,
+            7.274
+          ],
+          [
+            7.808,
+            8.542
+          ]
+        ]
+      },
+      {
+        "track_id": "face-6-visible",
+        "concept": "face",
+        "class": "face",
+        "status": "kept_visible",
+        "effect": null,
+        "spans": [
+          [
+            6.139,
+            6.24
+          ]
+        ]
+      },
+      {
+        "track_id": "face-7",
+        "concept": "face",
+        "class": "face",
+        "status": "kept_visible",
+        "effect": null,
+        "spans": [
+          [
+            6.406,
+            8.475
+          ]
+        ]
+      },
+      {
+        "track_id": "face-16",
+        "concept": "face",
+        "class": "face",
+        "status": "kept_visible",
+        "effect": null,
+        "spans": [
+          [
+            11.078,
+            11.144
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-1",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            2.369,
+            2.402
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-2",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            12.646,
+            12.679
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-3",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            4.538,
+            4.571
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-4",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            5.906,
+            5.939
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-5",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            6.406,
+            6.44
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-6",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            8.308,
+            8.342
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-7",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            10.177,
+            10.21
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-8",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            8.809,
+            8.842
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-9",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            9.943,
+            9.977
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-10",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            10.31,
+            10.344
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-11",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            13.213,
+            13.247
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-12",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            12.713,
+            12.746
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-13",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            11.445,
+            11.478
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-14",
+        "concept": "face",
+        "class": "face",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            12.546,
+            12.579
+          ]
+        ]
+      }
+    ]
+  },
+  "modes": {
+    "planner": "llama3.1:8b",
+    "segmenter": "SAM 3.1 (Tesla T4, fp16)",
+    "auditor": "none (SAM re-check only)"
+  },
+  "replay": null
+}

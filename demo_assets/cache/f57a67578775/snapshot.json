@@ -1,0 +1,215 @@
+{
+  "id": "20c32973f0",
+  "video_id": "sample-desk_inbox",
+  "instruction": "Black out the laptop screen.",
+  "parent_job_id": null,
+  "status": "done",
+  "error": null,
+  "progress": 1.0,
+  "elapsed_s": 602.17,
+  "plan": {
+    "summary": "Black out the laptop screen",
+    "source": "llama3.1:8b",
+    "warnings": [],
+    "steps": [
+      {
+        "id": "s1",
+        "op": "segment",
+        "concept": "laptop screen",
+        "source": null,
+        "reference": null,
+        "inputs": [],
+        "effect": null,
+        "note": "laptop screen",
+        "label": "Segment(\"laptop screen\")"
+      },
+      {
+        "id": "s2",
+        "op": "effect",
+        "concept": null,
+        "source": "s1",
+        "reference": null,
+        "inputs": [],
+        "effect": "blackout",
+        "note": "laptop screen",
+        "label": "Blackout(s1)"
+      }
+    ]
+  },
+  "stages": [
+    {
+      "key": "plan",
+      "title": "Plan",
+      "blurb": "Llama 3.1 turns the instruction into tool calls",
+      "status": "done",
+      "detail": "2 steps",
+      "duration_s": 115.9
+    },
+    {
+      "key": "segment",
+      "title": "Segment",
+      "blurb": "SAM 3.1 finds and tracks each concept",
+      "status": "done",
+      "detail": "1 tracks across 1 concepts",
+      "duration_s": 185.89
+    },
+    {
+      "key": "compose",
+      "title": "Compose",
+      "blurb": "Mask logic applies selections and exceptions",
+      "status": "done",
+      "detail": "1 to redact, 0 kept",
+      "duration_s": 0.0
+    },
+    {
+      "key": "render",
+      "title": "Render",
+      "blurb": "Effects are applied frame by frame",
+      "status": "done",
+      "detail": "199 frames",
+      "duration_s": 18.57
+    },
+    {
+      "key": "audit",
+      "title": "Audit",
+      "blurb": "Muse Spark checks output frames for leaks",
+      "status": "done",
+      "detail": "1 leak(s) found",
+      "duration_s": 186.66
+    },
+    {
+      "key": "patch",
+      "title": "Patch",
+      "blurb": "Leaks are re-segmented and re-rendered",
+      "status": "done",
+      "detail": "0 patched, 1 flagged",
+      "duration_s": 95.09
+    }
+  ],
+  "events": [
+    {
+      "t": 115.92,
+      "level": "info",
+      "stage": "plan",
+      "message": "llama3.1:8b produced 2 steps."
+    },
+    {
+      "t": 301.82,
+      "level": "info",
+      "stage": "segment",
+      "message": "Segment(\"laptop screen\") found 1 tracked instance."
+    },
+    {
+      "t": 301.82,
+      "level": "info",
+      "stage": "compose",
+      "message": "1 instance(s) to redact, 0 kept visible by exception."
+    },
+    {
+      "t": 507.05,
+      "level": "info",
+      "stage": "audit",
+      "message": "Audit round 1: checked 17 sampled frames and re-segmented all 199, found 1 leaked object(s) across 19 frame reports."
+    },
+    {
+      "t": 602.14,
+      "level": "warn",
+      "stage": "audit",
+      "message": "1 possible leak(s) need manual review."
+    },
+    {
+      "t": 602.17,
+      "level": "info",
+      "stage": "done",
+      "message": "Redaction report written (digest 22bf0227351c\u2026)."
+    },
+    {
+      "t": 602.17,
+      "level": "info",
+      "stage": "done",
+      "message": "Done. Redacted video, audit log and report are ready."
+    }
+  ],
+  "outputs": {
+    "original_url": "/samples/desk_inbox.mp4",
+    "redacted_url": "/cached/f57a67578775/redacted.mp4",
+    "masks_url": "/cached/f57a67578775/masks.mp4",
+    "audit_url": "/cached/f57a67578775/audit.json",
+    "report_url": "/cached/f57a67578775/report.html"
+  },
+  "audit": {
+    "entries": [
+      {
+        "track_id": "laptop_screen-1",
+        "concept": "laptop screen",
+        "effect": "blackout",
+        "status": "verified",
+        "start_s": 0.0,
+        "end_s": 7.96,
+        "frames": 199,
+        "confidence": 0.908,
+        "note": "No leak found in 17 sampled frames or by the SAM re-check of all 199 frames it appears in."
+      },
+      {
+        "track_id": "leak-1",
+        "concept": "laptop screen",
+        "effect": null,
+        "status": "flagged",
+        "start_s": 5.16,
+        "end_s": 5.2,
+        "frames": 1,
+        "confidence": 0.0,
+        "note": "SAM re-check still finds a laptop screen at 5.16s (78% hidden). Couldn't re-segment it; review this moment manually."
+      }
+    ],
+    "counts": {
+      "verified": 1,
+      "patched": 0,
+      "kept_visible": 0,
+      "flagged": 1
+    },
+    "rounds": 1,
+    "audited_frames": 17,
+    "rechecked_frames": 199,
+    "frame_count": 199,
+    "patches": []
+  },
+  "timeline": {
+    "duration_s": 7.96,
+    "fps": 25.0,
+    "tracks": [
+      {
+        "track_id": "laptop_screen-1",
+        "concept": "laptop screen",
+        "class": "screen",
+        "status": "verified",
+        "effect": "blackout",
+        "spans": [
+          [
+            0.0,
+            7.96
+          ]
+        ]
+      },
+      {
+        "track_id": "leak-1",
+        "concept": "laptop screen",
+        "class": "screen",
+        "status": "flagged",
+        "effect": null,
+        "spans": [
+          [
+            5.16,
+            5.2
+          ]
+        ]
+      }
+    ]
+  },
+  "modes": {
+    "planner": "llama3.1:8b",
+    "segmenter": "SAM 3.1 (Tesla T4, fp16)",
+    "auditor": "none (SAM re-check only)"
+  },
+  "replay": null
+}

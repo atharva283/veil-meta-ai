@@ -102,7 +102,13 @@ export default function App() {
               <Pipeline job={job} />
             </>
           ) : (
-            <SourcePicker samples={samples} uploading={uploading} onUpload={upload} onPick={pick} />
+            <SourcePicker
+              samples={samples}
+              uploading={uploading}
+              onUpload={upload}
+              onPick={pick}
+              replayOnly={health?.cache_only}
+            />
           )}
         </div>
         <aside className="side-col">

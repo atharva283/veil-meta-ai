@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Veil redaction report</title>
+<style>
+:root { --fg:#1d1d1f; --muted:#6b6b72; --line:#e3e3e8; --bg:#fff; --ok:#1f7a3f; --patch:#c2410c; --kept:#2563eb; --flag:#b91c1c; }
+body { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); background: var(--bg); max-width: 1000px; margin: 0 auto; padding: 32px 16px; }
+h1 { font-size: 24px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 28px 0 8px; }
+.muted { color: var(--muted); } blockquote { margin: 12px 0; padding: 8px 14px; border-left: 3px solid var(--line); font-size: 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; } td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+code { font-size: 11px; word-break: break-all; } .nowrap { white-space: nowrap; } .digest { font-size: 13px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
+.st-verified { color: var(--ok); } .st-patched { color: var(--patch); } .st-kept_visible { color: var(--kept); } .st-flagged { color: var(--flag); font-weight: 600; }
+.figs { display: flex; flex-wrap: wrap; gap: 16px; } figure { margin: 0; } figure img { height: 140px; border: 1px solid var(--line); } figcaption { font-size: 12px; color: var(--muted); }
+footer { margin-top: 32px; font-size: 12px; color: var(--muted); }
+</style></head><body>
+<h1>Redaction report</h1>
+<p class="muted">Desk with an open inbox · 1280×720, 8.0s, 199 frames · job da31159bd6 · generated 2026-10-27T18:00:57Z</p>
+<blockquote>“Also black out the phone.”</blockquote>
+<p class="digest"><b>Report digest</b> <code>6288aedbac785d651f57f6f1a9698421484db53a48f9c3f333e04e5efdda3d92</code></p>
+
+<h2>Outcome</h2>
+<p>2 objects redacted, 0 of them fixed by the audit,
+0 kept visible on purpose, 1 flagged for manual review.</p>
+<p>Checks: 17 sampled frames reviewed by the auditor; SAM re-segmented 199 of 199 output frames (100%); 1 audit round.</p>
+
+<h2>Models</h2><ul><li><b>planner</b>: llama3.1:8b</li><li><b>segmenter</b>: SAM 3.1 (Tesla T4, fp16)</li><li><b>auditor</b>: none (SAM re-check only)</li></ul>
+<h2>Plan</h2><ol><li>Segment(&quot;laptop screen&quot;) — laptop screen</li><li>Blackout(s1) — laptop screen</li><li>Segment(&quot;phone&quot;) — phone</li><li>Blackout(s3) — phone</li></ol>
+
+<h2>Objects</h2>
+<table><thead><tr><th>Id</th><th>Concept</th><th>Effect</th><th>Status</th><th>When</th><th>Frames</th><th>Note</th></tr></thead><tbody><tr><td>laptop_screen-1</td><td>laptop screen</td><td>blackout</td><td class='st-verified'>verified</td><td class='nowrap'>0.00–7.96s</td><td>199</td><td>No leak found in 17 sampled frames or by the SAM re-check of all 199 frames it appears in.</td></tr><tr><td>phone-1</td><td>phone</td><td>blackout</td><td class='st-verified'>verified</td><td class='nowrap'>0.00–7.96s</td><td>199</td><td>No leak found in 17 sampled frames or by the SAM re-check of all 199 frames it appears in.</td></tr><tr><td>leak-1</td><td>laptop screen</td><td>—</td><td class='st-flagged'>flagged</td><td class='nowrap'>5.08–5.12s</td><td>1</td><td>SAM re-check still finds a laptop screen at 5.08s (80% hidden). Couldn&#x27;t re-segment it; review this moment manually.</td></tr></tbody></table>
+
+<h2>Audit fixes</h2><div class="figs"><p class='muted'>No object needed an audit fix.</p></div>
+
+<h2>Artifact chain</h2>
+<table><thead><tr><th>Artifact</th><th>SHA-256</th><th>Chain link</th></tr></thead><tbody><tr><td>input</td><td><code>0b1b5fe21f96af15a86992ea6e3ac4ef89e32c49e5a73e8827ac345b4fe8c1fb</code></td><td><code>2d545b83da56ea6ad2b9f2a2d029cfed14dcbcb76ea6bebc9052e7ba7c706357</code></td></tr><tr><td>plan.json</td><td><code>17ce83fa7127cf8ae018b6676f801c2a7f1f1d02f53b54e32507d552a4e5beaa</code></td><td><code>67f6c13958a48af67f8e0b8e94e64e9b1eb5b24549954b6e667a8919c9171b73</code></td></tr><tr><td>redacted.mp4</td><td><code>298dd30e879ee700d0f38063b0b94ecc79d389f74716d4865e8dd469be35d688</code></td><td><code>94e198c196696fbf6331e18a5a929cbe9c2696e8ab08ca9177b6f1651878a3d0</code></td></tr><tr><td>masks.mp4</td><td><code>d94baaaec0e8b31c292566b3976b29230d32e89b237a346268ee577d4f74c947</code></td><td><code>51b3250cedd4576f7565ab203cfbf2d374d8fa7f53d1de6368f60720bdcb8561</code></td></tr><tr><td>audit.json</td><td><code>94ad7de69d5533a89643fadade39618f03651987db9b1f1cc56eb50849c4b5b0</code></td><td><code>6288aedbac785d651f57f6f1a9698421484db53a48f9c3f333e04e5efdda3d92</code></td></tr></tbody></table>
+<p class="muted">link₀ = sha256("veil-report-v1"), linkᵢ = sha256(linkᵢ₋₁ + name + sha256). The digest is the last link.
+Recompute with <code>python -m app.report verify &lt;job dir&gt; --original &lt;clip&gt;</code>.</p>
+
+<footer>This report is an evidence trail for a data-minimization review of one video. It does not certify compliance with any law or standard; automated redaction can miss things, so review flagged moments by hand.</footer>
+</body></html>

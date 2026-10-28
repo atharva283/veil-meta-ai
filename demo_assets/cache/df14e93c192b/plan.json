@@ -1,0 +1,87 @@
+{
+  "summary": "Blur faces except the woman in the pink coat; blackout bank logo",
+  "steps": [
+    {
+      "id": "s1",
+      "op": "segment",
+      "concept": "face",
+      "source": null,
+      "reference": null,
+      "inputs": [],
+      "effect": null,
+      "note": null
+    },
+    {
+      "id": "s2",
+      "op": "segment",
+      "concept": "person",
+      "source": null,
+      "reference": null,
+      "inputs": [],
+      "effect": null,
+      "note": null
+    },
+    {
+      "id": "s3",
+      "op": "segment",
+      "concept": "pink coat",
+      "source": null,
+      "reference": null,
+      "inputs": [],
+      "effect": null,
+      "note": null
+    },
+    {
+      "id": "s4",
+      "op": "select",
+      "concept": null,
+      "source": "s2",
+      "reference": "s3",
+      "inputs": [],
+      "effect": null,
+      "note": "the woman in the pink coat"
+    },
+    {
+      "id": "s5",
+      "op": "subtract",
+      "concept": null,
+      "source": "s1",
+      "reference": "s4",
+      "inputs": [],
+      "effect": null,
+      "note": "faces except the woman in the pink coat"
+    },
+    {
+      "id": "s6",
+      "op": "effect",
+      "concept": null,
+      "source": "s5",
+      "reference": null,
+      "inputs": [],
+      "effect": "blur",
+      "note": "faces"
+    },
+    {
+      "id": "s7",
+      "op": "segment",
+      "concept": "bank logo",
+      "source": null,
+      "reference": null,
+      "inputs": [],
+      "effect": null,
+      "note": null
+    },
+    {
+      "id": "s8",
+      "op": "effect",
+      "concept": null,
+      "source": "s7",
+      "reference": null,
+      "inputs": [],
+      "effect": "blackout",
+      "note": "bank logo"
+    }
+  ],
+  "warnings": [],
+  "source": "llama3.1:8b"
+}

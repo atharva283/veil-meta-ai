@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from . import cache
 from .config import settings
 from .jobs import jobs
 from .pipeline.video_io import VideoError
@@ -43,11 +44,20 @@ def _mode(live: bool, live_name: str, mock_name: str) -> dict:
     return {"live": live, "name": live_name if live else mock_name}
 
 
+def _recorded_modes() -> dict:
+    """In replay mode, the models that recorded the frozen runs (every run is live by construction)."""
+    entries = cache.sample_cache._entries()
+    return {
+        role: {"live": True, "recorded": True, "name": ", ".join(sorted({e.models.get(role, "") for e in entries} - {""}))}
+        for role in ("planner", "segmenter", "auditor")
+    }
+
+
 @app.get("/api/health")
 def health() -> dict:
     return {
         "ok": True,
-        "modes": {
+        "modes": _recorded_modes() if settings.cache_only else {
             "planner": _mode(settings.planner_live, settings.planner_model, "mock planner"),
             "segmenter": _mode(settings.segmenter_live, "SAM 3.1 (local GPU)" if settings.sam_local else "SAM 3.1 on Modal", "mock SAM 3.1"),
             "auditor": _mode(settings.auditor_live, settings.auditor_model, "mock Muse Spark"),
@@ -59,7 +69,20 @@ def health() -> dict:
 
 @app.get("/api/samples")
 def samples() -> list[dict]:
-    return [v.public() for v in store.samples()]
+    if not settings.cache_only:
+        return [v.public() for v in store.samples()]
+    # Replay mode: only clips with frozen runs, suggesting only the instructions that were recorded.
+    entries = cache.sample_cache._entries()
+    out = []
+    for v in store.samples():
+        runs = [e for e in entries if e.video_id == v.id]
+        if runs:
+            out.append({
+                **v.public(),
+                "suggested_prompts": [e.instruction for e in runs if e.parent_key is None],
+                "follow_up_prompts": [e.instruction for e in runs if e.parent_key is not None],
+            })  # fmt: skip
+    return out
 
 
 @app.post("/api/videos")

@@ -1,0 +1,54 @@
+[
+  {
+    "key": "f57a67578775",
+    "video_id": "sample-desk_inbox",
+    "instruction": "Black out the laptop screen.",
+    "parent_key": null,
+    "models": {
+      "planner": "llama3.1:8b",
+      "segmenter": "SAM 3.1 (Tesla T4, fp16)",
+      "auditor": "none (SAM re-check only)"
+    },
+    "source_job": "20c32973f0",
+    "frozen_at": "2026-10-27"
+  },
+  {
+    "key": "6ba8326bb9dc",
+    "video_id": "sample-desk_inbox",
+    "instruction": "Also black out the phone.",
+    "parent_key": "f57a67578775",
+    "models": {
+      "planner": "llama3.1:8b",
+      "segmenter": "SAM 3.1 (Tesla T4, fp16)",
+      "auditor": "none (SAM re-check only)"
+    },
+    "source_job": "da31159bd6",
+    "frozen_at": "2026-10-27"
+  },
+  {
+    "key": "f1033d7cf4b3",
+    "video_id": "sample-manchester_street",
+    "instruction": "Blur every face except the woman in the pink coat.",
+    "parent_key": null,
+    "models": {
+      "planner": "llama3.1:8b",
+      "segmenter": "SAM 3.1 (Tesla T4, fp16)",
+      "auditor": "none (SAM re-check only)"
+    },
+    "source_job": "2b0139d63d",
+    "frozen_at": "2026-10-27"
+  },
+  {
+    "key": "df14e93c192b",
+    "video_id": "sample-manchester_street",
+    "instruction": "Also hide the bank logo.",
+    "parent_key": "f1033d7cf4b3",
+    "models": {
+      "planner": "llama3.1:8b",
+      "segmenter": "SAM 3.1 (Tesla T4, fp16)",
+      "auditor": "none (SAM re-check only)"
+    },
+    "source_job": "b01efb31bf",
+    "frozen_at": "2026-10-27"
+  }
+]

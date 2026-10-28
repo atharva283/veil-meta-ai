@@ -90,6 +90,17 @@ def test_cache_only_mode_refuses_uncached_work(run, street, sample_cache, monkey
     assert client.post("/api/plan", json={"instruction": DEMO}).status_code == 409  # no planner calls either
 
 
+def test_replay_mode_reports_the_recording_models_and_only_recorded_clips(run, street, sample_cache, monkeypatch):
+    sample_cache.freeze(jobs.jobs_dir / run.id, allow_mock=True)
+    monkeypatch.setattr(main, "settings", dataclasses.replace(main.settings, cache_only=True))
+    client = TestClient(main.app)
+    modes = client.get("/api/health").json()["modes"]
+    assert modes["segmenter"] == {"live": True, "recorded": True, "name": run.modes["segmenter"]}
+    clips = client.get("/api/samples").json()
+    assert [c["id"] for c in clips] == [street.id]  # the other samples have no recorded runs
+    assert clips[0]["suggested_prompts"] == [DEMO] and clips[0]["follow_up_prompts"] == []
+
+
 def test_build_fails_fast_on_settings_that_would_get_every_run_refused(monkeypatch, tmp_path):
     with pytest.raises(SystemExit, match="unknown clip"):
         cache_mod.build(allow_mock=False, clips=["manchester"])

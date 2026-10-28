@@ -1,0 +1,47 @@
+{
+  "summary": "Black out the laptop screen and phone",
+  "steps": [
+    {
+      "id": "s1",
+      "op": "segment",
+      "concept": "laptop screen",
+      "source": null,
+      "reference": null,
+      "inputs": [],
+      "effect": null,
+      "note": "laptop screen"
+    },
+    {
+      "id": "s2",
+      "op": "effect",
+      "concept": null,
+      "source": "s1",
+      "reference": null,
+      "inputs": [],
+      "effect": "blackout",
+      "note": "laptop screen"
+    },
+    {
+      "id": "s3",
+      "op": "segment",
+      "concept": "phone",
+      "source": null,
+      "reference": null,
+      "inputs": [],
+      "effect": null,
+      "note": "phone"
+    },
+    {
+      "id": "s4",
+      "op": "effect",
+      "concept": null,
+      "source": "s3",
+      "reference": null,
+      "inputs": [],
+      "effect": "blackout",
+      "note": "phone"
+    }
+  ],
+  "warnings": [],
+  "source": "llama3.1:8b"
+}

@@ -26,12 +26,21 @@ export function TopBar({ health, video, onChangeClip, busy }: Props) {
       <ul className="models" aria-label="Model connections">
         {MODELS.map((m) => {
           const mode = health?.modes[m.key];
-          const state = !health ? "Checking" : mode?.live ? `Live: ${mode.name}` : "Offline mock";
+          // Replay mode: no sampled-frame auditor was used; SAM 3.1 re-checked the output instead.
+          const label = mode?.recorded && m.key === "auditor" && mode.name.startsWith("none") ? "SAM 3.1 re-check" : m.label;
+          const state = !health
+            ? "Checking"
+            : mode?.recorded
+              ? `Recorded run: ${mode.name}`
+              : mode?.live
+                ? `Live: ${mode.name}`
+                : "Offline mock";
+          const tag = !health ? "…" : mode?.recorded ? "recorded" : mode?.live ? "live" : "mock";
           return (
             <li key={m.key} className={mode?.live ? "is-live" : "is-mock"} title={`${m.role}. ${state}.`}>
               <span className="dot" aria-hidden />
-              {m.label}
-              <span className="faint">{!health ? "…" : mode?.live ? "live" : "mock"}</span>
+              {label}
+              <span className="faint">{tag}</span>
             </li>
           );
         })}

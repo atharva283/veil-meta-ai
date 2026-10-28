@@ -7,9 +7,10 @@ type Props = {
   uploading: boolean;
   onUpload: (file: File) => void;
   onPick: (video: VideoInfo) => void;
+  replayOnly?: boolean; // public demo: recorded runs only, no uploads
 };
 
-export function SourcePicker({ samples, uploading, onUpload, onPick }: Props) {
+export function SourcePicker({ samples, uploading, onUpload, onPick, replayOnly }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
 
@@ -20,6 +21,17 @@ export function SourcePicker({ samples, uploading, onUpload, onPick }: Props) {
 
   return (
     <section className="picker" aria-label="Choose a video">
+      {replayOnly ? (
+        <div className="dropzone">
+          <div className="dropzone-body">
+            <h2>Replays of recorded runs</h2>
+            <p className="muted">
+              This demo replays runs recorded on a GPU with Llama 3.1 and SAM 3.1, so nothing is computed while you
+              watch. Pick a clip, then one of its suggested instructions.
+            </p>
+          </div>
+        </div>
+      ) : (
       <div
         className={`dropzone${over ? " is-over" : ""}`}
         onDragOver={(e) => {
@@ -56,10 +68,11 @@ export function SourcePicker({ samples, uploading, onUpload, onPick }: Props) {
           </div>
         )}
       </div>
+      )}
 
       {samples.length > 0 && (
         <div className="samples">
-          <h3>Or start with a sample clip</h3>
+          <h3>{replayOnly ? "Sample clips" : "Or start with a sample clip"}</h3>
           <ul>
             {samples.map((s) => (
               <li key={s.id}>

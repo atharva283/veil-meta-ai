@@ -1,9 +1,11 @@
-export type ModeInfo = { live: boolean; name: string };
+// recorded: replay mode, naming the model that recorded the frozen runs.
+export type ModeInfo = { live: boolean; name: string; recorded?: boolean };
 
 export type Health = {
   ok: boolean;
   modes: { planner: ModeInfo; segmenter: ModeInfo; auditor: ModeInfo };
   samples: number;
+  cache_only?: boolean;
 };
 
 export type VideoInfo = {

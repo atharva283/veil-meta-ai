@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "generated_at": "2026-10-27T18:00:57Z",
+  "job_id": "da31159bd6",
+  "instruction": "Also black out the phone.",
+  "video": {
+    "title": "Desk with an open inbox",
+    "width": 1280,
+    "height": 720,
+    "fps": 25.0,
+    "frame_count": 199,
+    "duration_s": 7.96,
+    "has_audio": false
+  },
+  "models": {
+    "planner": "llama3.1:8b",
+    "segmenter": "SAM 3.1 (Tesla T4, fp16)",
+    "auditor": "none (SAM re-check only)"
+  },
+  "plan": [
+    {
+      "step": "Segment(\"laptop screen\")",
+      "note": "laptop screen"
+    },
+    {
+      "step": "Blackout(s1)",
+      "note": "laptop screen"
+    },
+    {
+      "step": "Segment(\"phone\")",
+      "note": "phone"
+    },
+    {
+      "step": "Blackout(s3)",
+      "note": "phone"
+    }
+  ],
+  "coverage": {
+    "sampled_frames": 17,
+    "rechecked_frames": 199,
+    "frame_count": 199,
+    "rounds": 1
+  },
+  "counts": {
+    "verified": 2,
+    "patched": 0,
+    "kept_visible": 0,
+    "flagged": 1
+  },
+  "objects": [
+    {
+      "track_id": "laptop_screen-1",
+      "concept": "laptop screen",
+      "effect": "blackout",
+      "status": "verified",
+      "start_s": 0.0,
+      "end_s": 7.96,
+      "frames": 199,
+      "confidence": 0.908,
+      "note": "No leak found in 17 sampled frames or by the SAM re-check of all 199 frames it appears in."
+    },
+    {
+      "track_id": "phone-1",
+      "concept": "phone",
+      "effect": "blackout",
+      "status": "verified",
+      "start_s": 0.0,
+      "end_s": 7.96,
+      "frames": 199,
+      "confidence": 0.948,
+      "note": "No leak found in 17 sampled frames or by the SAM re-check of all 199 frames it appears in."
+    },
+    {
+      "track_id": "leak-1",
+      "concept": "laptop screen",
+      "effect": null,
+      "status": "flagged",
+      "start_s": 5.08,
+      "end_s": 5.12,
+      "frames": 1,
+      "confidence": 0.0,
+      "note": "SAM re-check still finds a laptop screen at 5.08s (80% hidden). Couldn't re-segment it; review this moment manually."
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "input",
+      "sha256": "0b1b5fe21f96af15a86992ea6e3ac4ef89e32c49e5a73e8827ac345b4fe8c1fb",
+      "link": "2d545b83da56ea6ad2b9f2a2d029cfed14dcbcb76ea6bebc9052e7ba7c706357"
+    },
+    {
+      "name": "plan.json",
+      "sha256": "17ce83fa7127cf8ae018b6676f801c2a7f1f1d02f53b54e32507d552a4e5beaa",
+      "link": "67f6c13958a48af67f8e0b8e94e64e9b1eb5b24549954b6e667a8919c9171b73"
+    },
+    {
+      "name": "redacted.mp4",
+      "sha256": "298dd30e879ee700d0f38063b0b94ecc79d389f74716d4865e8dd469be35d688",
+      "link": "94e198c196696fbf6331e18a5a929cbe9c2696e8ab08ca9177b6f1651878a3d0"
+    },
+    {
+      "name": "masks.mp4",
+      "sha256": "d94baaaec0e8b31c292566b3976b29230d32e89b237a346268ee577d4f74c947",
+      "link": "51b3250cedd4576f7565ab203cfbf2d374d8fa7f53d1de6368f60720bdcb8561"
+    },
+    {
+      "name": "audit.json",
+      "sha256": "94ad7de69d5533a89643fadade39618f03651987db9b1f1cc56eb50849c4b5b0",
+      "link": "6288aedbac785d651f57f6f1a9698421484db53a48f9c3f333e04e5efdda3d92"
+    }
+  ],
+  "digest": "6288aedbac785d651f57f6f1a9698421484db53a48f9c3f333e04e5efdda3d92"
+}

@@ -8,3 +8,10 @@ frontend/node_modules/
 frontend/dist/
 *.tsbuildinfo
 .DS_Store
+
+# Face photos for the desk-shot props stay local (see demo_assets/props/RECORDING.md)
+demo_assets/props/*.jpg
+demo_assets/props/*.png
+
+# Comparison videos are editing material for the demo video (rendered by `python -m app.cache build`)
+demo_assets/cache/*/comparison_*.mp4
