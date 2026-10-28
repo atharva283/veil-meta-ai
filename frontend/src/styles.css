@@ -1205,3 +1205,29 @@ td.note {
     transition: none;
   }
 }
+
+/* ---------- footer ---------- */
+
+.site-footer {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 16px 28px 20px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.site-footer strong {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.site-footer a {
+  color: var(--muted);
+}
+
+.site-footer a:hover {
+  color: var(--text);
+}

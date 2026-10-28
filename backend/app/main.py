@@ -169,5 +169,6 @@ if settings.frontend_dist.exists():
         target = settings.frontend_dist / path
         if path and target.is_file() and target.resolve().is_relative_to(settings.frontend_dist.resolve()):
             return FileResponse(target)
-        return FileResponse(settings.frontend_dist / "index.html")
+        # Revalidate on every load, so a redeploy is seen at once (the hashed /assets files can be cached).
+        return FileResponse(settings.frontend_dist / "index.html", headers={"Cache-Control": "no-cache"})
 

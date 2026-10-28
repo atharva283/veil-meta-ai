@@ -128,6 +128,18 @@ export default function App() {
         </aside>
       </main>
       {job?.status === "done" && <AuditLog job={job} time={time} onSeek={seek} />}
+      <footer className="site-footer">
+        <strong>Built with Llama</strong>
+        <span>
+          Llama 3.1 is licensed under the{" "}
+          <a href="https://github.com/meta-llama/llama-models/blob/main/models/llama3_1/LICENSE">
+            Llama 3.1 Community License
+          </a>
+          . SAM 3.1 is used under the{" "}
+          <a href="https://github.com/facebookresearch/sam3/blob/main/LICENSE">SAM License</a>. Footage: Pexels.
+        </span>
+        <a href="https://github.com/atharva283/veil-meta-ai">Source on GitHub</a>
+      </footer>
     </div>
   );
 }
