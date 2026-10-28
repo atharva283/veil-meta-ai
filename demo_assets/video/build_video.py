@@ -197,6 +197,19 @@ def tts_models(key: str) -> list[str]:
     return [m["name"].removeprefix("models/") for m in r.json().get("models", []) if "tts" in m["name"]]
 
 
+VOICE_DIR = ROOT / "demo_assets" / "video" / "voice"  # your own recordings: scene_01.wav ... scene_10.wav
+
+
+def manual_voice(number: int) -> Path:
+    """Your recording for scene `number`, as 48 kHz mono PCM with its leading and trailing silence trimmed."""
+    found = [p for ext in ("wav", "mp3", "m4a", "flac", "ogg") if (p := VOICE_DIR / f"scene_{number:02d}.{ext}").exists()]
+    out = BUILD / "voice-manual" / f"scene_{number:02d}.wav"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    trim = "silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.05"
+    ffmpeg("-i", str(found[0]), "-af", f"{trim},areverse,{trim},areverse", "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", str(out))
+    return out
+
+
 def wav_seconds(path: Path) -> float:
     with wave.open(str(path)) as w:
         return w.getnframes() / w.getframerate()
@@ -587,11 +600,17 @@ def main() -> None:
     ap.add_argument("--voice", default="Kore", help="Gemini prebuilt voice (e.g. Kore, Charon, Puck, Aoede)")
     ap.add_argument("--model", default="gemini-3.8-flash-tts")
     ap.add_argument("--reuse-ui", action="store_true", help="reuse the last UI capture instead of recording again")
+    ap.add_argument("--manual-voice", action="store_true", help=f"use your own recordings (scene_01.wav ...) from {VOICE_DIR}; no API calls")
     args = ap.parse_args()
 
     load_dotenv(ROOT / ".env")
     key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if not args.no_voice and not key:
+    if args.manual_voice:
+        names = [f"scene_{i:02d}" for i in range(1, len(SCENES) + 1)]
+        missing = [n for n in names if not any((VOICE_DIR / f"{n}.{e}").exists() for e in ("wav", "mp3", "m4a", "flac", "ogg"))]
+        if missing:  # never mix your voice with the generated one
+            raise SystemExit(f"missing in {VOICE_DIR}: {', '.join(m + '.wav' for m in missing)}")
+    elif not args.no_voice and not key:
         raise SystemExit("GEMINI_API_KEY is empty in .env (or pass --no-voice for a silent draft)")
     BUILD.mkdir(parents=True, exist_ok=True)
 
@@ -605,8 +624,11 @@ def main() -> None:
         ui = capture_ui()
         marks.write_text(json.dumps({k: [str(p), s] for k, (p, s) in ui.items()}))
 
-    for s in SCENES:
-        voice = None if args.no_voice else narrate(s, args.model, args.voice, key)
+    for number, s in enumerate(SCENES, 1):
+        if args.manual_voice:
+            voice = manual_voice(number)
+        else:
+            voice = None if args.no_voice else narrate(s, args.model, args.voice, key)
         spoken = wav_seconds(voice) if voice else len(s.say.split()) / 2.6
         frames = round(max(spoken + LEAD + TAIL + s.hold, s.min_seconds) * FPS)  # whole frames: picture and sound stay aligned
         s.timing = {"voice": spoken, "frames": frames, "seconds": frames / FPS, "wav": voice}

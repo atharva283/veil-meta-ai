@@ -19,3 +19,6 @@ demo_assets/cache/*/comparison_*.mp4
 # Demo video build: tools venv and rendered output (python demo_assets/video/build_video.py)
 demo_assets/video/.venv/
 demo_assets/video/build/
+
+# Your own voiceover recordings for the demo video (build_video.py --manual-voice)
+demo_assets/video/voice/
