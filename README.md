@@ -5,7 +5,7 @@
 > "Blur every face except the woman in the pink coat."
 
 **Live demo:** https://atharva283--veil-demo-web.us-east.modal.run (replays of recorded runs, see below)
-**Demo video:** added at submission
+**Demo video:** https://www.youtube.com/watch?v=o4t9FGPvPfQ (3 minutes)
 
 Built for the Meta Global AI Developer Hackathon, Indie Developer track. Built with Llama.
 

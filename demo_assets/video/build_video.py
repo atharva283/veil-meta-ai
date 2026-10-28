@@ -200,13 +200,16 @@ def tts_models(key: str) -> list[str]:
 VOICE_DIR = ROOT / "demo_assets" / "video" / "voice"  # your own recordings: scene_01.wav ... scene_10.wav
 
 
-def manual_voice(number: int) -> Path:
-    """Your recording for scene `number`, as 48 kHz mono PCM with its leading and trailing silence trimmed."""
+def manual_voice(number: int, tempo: float = 1.0) -> Path:
+    """Your recording for scene `number`, as 48 kHz mono PCM with its leading and trailing silence trimmed.
+
+    `tempo` above 1 speeds the read up without changing its pitch (pauses scale with it).
+    """
     found = [p for ext in ("wav", "mp3", "m4a", "flac", "ogg") if (p := VOICE_DIR / f"scene_{number:02d}.{ext}").exists()]
     out = BUILD / "voice-manual" / f"scene_{number:02d}.wav"
     out.parent.mkdir(parents=True, exist_ok=True)
     trim = "silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.05"
-    ffmpeg("-i", str(found[0]), "-af", f"{trim},areverse,{trim},areverse", "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", str(out))
+    ffmpeg("-i", str(found[0]), "-af", f"{trim},areverse,{trim},areverse,atempo={tempo}", "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le", str(out))
     return out
 
 
@@ -601,6 +604,7 @@ def main() -> None:
     ap.add_argument("--model", default="gemini-3.8-flash-tts")
     ap.add_argument("--reuse-ui", action="store_true", help="reuse the last UI capture instead of recording again")
     ap.add_argument("--manual-voice", action="store_true", help=f"use your own recordings (scene_01.wav ...) from {VOICE_DIR}; no API calls")
+    ap.add_argument("--tempo", type=float, default=1.0, help="with --manual-voice: speed your recordings up (e.g. 1.1), pitch unchanged")
     args = ap.parse_args()
 
     load_dotenv(ROOT / ".env")
@@ -626,7 +630,7 @@ def main() -> None:
 
     for number, s in enumerate(SCENES, 1):
         if args.manual_voice:
-            voice = manual_voice(number)
+            voice = manual_voice(number, args.tempo)
         else:
             voice = None if args.no_voice else narrate(s, args.model, args.voice, key)
         spoken = wav_seconds(voice) if voice else len(s.say.split()) / 2.6
@@ -635,7 +639,10 @@ def main() -> None:
     total = sum(s.timing["seconds"] for s in SCENES)
     print("\n".join(f"  {s.id:<12} {s.timing['seconds']:6.1f}s" for s in SCENES) + f"\n  {'total':<12} {total:6.1f}s", flush=True)
     if total > MAX_SECONDS:
-        raise SystemExit(f"{total:.1f}s is over the {MAX_SECONDS}s cap; shorten the narration")
+        spoken = sum(s.timing["voice"] for s in SCENES)
+        need = args.tempo * spoken / (spoken - total + MAX_SECONDS - 0.5)
+        hint = f" or re-run with --tempo {need:.2f}" if args.manual_voice else ""
+        raise SystemExit(f"{total:.1f}s is over the {MAX_SECONDS}s cap; shorten the narration{hint}")
 
     parts = BUILD / "parts"
     shutil.rmtree(parts, ignore_errors=True)
