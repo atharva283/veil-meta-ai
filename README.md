@@ -16,6 +16,8 @@
 [![Try the live demo](https://img.shields.io/badge/%E2%96%B6_Try_the_live_demo-1C2B33?style=for-the-badge)](https://atharva283--veil-demo-web.us-east.modal.run)
 &nbsp;
 [![Watch the 3-minute video](https://img.shields.io/badge/Watch_the_3--minute_video-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=o4t9FGPvPfQ)
+&nbsp;
+<a href="https://colab.research.google.com/github/atharva283/veil-meta-ai/blob/main/notebooks/veil_colab_runner.ipynb"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab" height="28"></a>
 
 <sub>Live demo: https://atharva283--veil-demo-web.us-east.modal.run · Video: https://www.youtube.com/watch?v=o4t9FGPvPfQ</sub>
 
